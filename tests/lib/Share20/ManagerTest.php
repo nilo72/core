@@ -2724,7 +2724,20 @@ class ManagerTest extends \Test\TestCase {
 			'path' => '/myPath',
 		]);
 
+		$calledAfterUpdate = [];
+		$this->eventDispatcher->addListener('share.afterupdate',
+			function (GenericEvent $event) use (&$calledAfterUpdate) {
+				$calledAfterUpdate[] = 'share.afterupdate';
+				$calledAfterUpdate[] = $event;
+			});
+
 		$manager->updateShare($share);
+		$this->assertInstanceOf(GenericEvent::class, $calledAfterUpdate[1]);
+		$this->assertEquals('share.afterupdate', $calledAfterUpdate[0]);
+		$this->assertArrayHasKey('permissionupdate', $calledAfterUpdate[1]);
+		$this->assertArrayHasKey('oldpermissions', $calledAfterUpdate[1]);
+		$this->assertArrayHasKey('shareobject', $calledAfterUpdate[1]);
+		$this->assertArrayHasKey('path', $calledAfterUpdate[1]);
 	}
 
 	public function testUpdateShareGroup() {
@@ -2831,7 +2844,19 @@ class ManagerTest extends \Test\TestCase {
 		$hookListner2->expects($this->never())->method('post');
 
 
+		$calledAfterUpdate = [];
+		$this->eventDispatcher->addListener('share.afterupdate',
+			function (GenericEvent $event) use (&$calledAfterUpdate) {
+				$calledAfterUpdate[] = 'share.afterupdate';
+				$calledAfterUpdate[] = $event;
+			});
 		$manager->updateShare($share);
+
+		$this->assertInstanceOf(GenericEvent::class, $calledAfterUpdate[1]);
+		$this->assertEquals('share.afterupdate', $calledAfterUpdate[0]);
+		$this->assertArrayHasKey('expiredateupdated', $calledAfterUpdate[1]);
+		$this->assertArrayHasKey('oldexpirydate', $calledAfterUpdate[1]);
+		$this->assertArrayHasKey('shareobject', $calledAfterUpdate[1]);
 	}
 
 	/**
