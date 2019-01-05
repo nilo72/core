@@ -22,28 +22,29 @@
 namespace OCP\Preview;
 
 use OCP\Files\File;
+use OCP\Files\FileInfo;
 
 /**
  * Interface IProvider2
  *
  * @package OCP\Preview
- * @since 10.1.0
+ * @since 10.0.9
  */
 interface IProvider2 {
 	/**
 	 * @return string Regex with the mimetypes that are supported by this provider
-	 * @since 10.1.0
+	 * @since 10.0.9
 	 */
 	public function getMimeType();
 
 	/**
 	 * Check if a preview can be generated for $path
 	 *
-	 * @param File $file
+	 * @param FileInfo $file
 	 * @return bool
-	 * @since 10.1.0
+	 * @since 10.0.9
 	 */
-	public function isAvailable(File $file);
+	public function isAvailable(FileInfo $file);
 
 	/**
 	 * get thumbnail for file at path $path
@@ -53,7 +54,7 @@ interface IProvider2 {
 	 * @param int $maxY The maximum Y size of the thumbnail. It can be smaller depending on the shape of the image
 	 * @param bool $scalingUp Disable/Enable upscaling of previews
 	 * @return bool|\OCP\IImage false if no preview was generated
-	 * @since 10.1.0
+	 * @since 10.0.9
 	 */
 	public function getThumbnail(File $file, $maxX, $maxY, $scalingUp);
 }

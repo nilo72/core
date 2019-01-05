@@ -55,18 +55,20 @@ class MigratorTest extends \Test\TestCase {
 	}
 
 	private function getUniqueTableName() {
-		return strtolower($this->getUniqueID($this->config->getSystemValue('dbtableprefix', 'oc_') . 'test_'));
+		return \strtolower($this->getUniqueID($this->config->getSystemValue('dbtableprefix', 'oc_') . 'test_'));
 	}
 
 	protected function tearDown() {
 		// Try to delete if exists (IF EXISTS NOT SUPPORTED IN ORACLE)
 		try {
 			$this->connection->exec('DROP TABLE ' . $this->connection->quoteIdentifier($this->tableNameTmp));
-		} catch (\Doctrine\DBAL\DBALException $e) {}
+		} catch (\Doctrine\DBAL\DBALException $e) {
+		}
 
 		try {
 			$this->connection->exec('DROP TABLE ' . $this->connection->quoteIdentifier($this->tableName));
-		} catch (\Doctrine\DBAL\DBALException $e) {}
+		} catch (\Doctrine\DBAL\DBALException $e) {
+		}
 		parent::tearDown();
 	}
 
@@ -74,7 +76,7 @@ class MigratorTest extends \Test\TestCase {
 		$indexName = $tableName . '_' . $indexName;
 		if ($this->isOracle()) {
 			// Oracle doesn't like long names...
-			return 'i' . substr(md5($indexName), 0, 29);
+			return 'i' . \substr(\md5($indexName), 0, 29);
 		}
 		return $indexName;
 	}
@@ -156,7 +158,7 @@ class MigratorTest extends \Test\TestCase {
 		$oldTablePrefix = $this->config->getSystemValue('dbtableprefix', 'oc_');
 
 		$this->config->setSystemValue('dbtableprefix', 'ownc_');
-		$this->tableName = strtolower($this->getUniqueID($this->config->getSystemValue('dbtableprefix') . 'test_'));
+		$this->tableName = \strtolower($this->getUniqueID($this->config->getSystemValue('dbtableprefix') . 'test_'));
 
 		list($startSchema, $endSchema) = $this->getDuplicateKeySchemas();
 		$migrator = $this->manager->getMigrator();
@@ -296,11 +298,10 @@ class MigratorTest extends \Test\TestCase {
 		$tableFk = $startSchema->createTable($this->tableNameTmp);
 		$tableFk->addColumn('fk_id', 'integer');
 		$tableFk->addColumn('name', 'string');
-		$tableFk->addForeignKeyConstraint($this->tableName, array('fk_id'), array('id'), array(), $fkName);
+		$tableFk->addForeignKeyConstraint($this->tableName, ['fk_id'], ['id'], [], $fkName);
 
 		$migrator = $this->manager->getMigrator();
 		$migrator->migrate($startSchema);
-
 
 		$this->assertTrue($startSchema->getTable($this->tableNameTmp)->hasForeignKey($fkName));
 	}

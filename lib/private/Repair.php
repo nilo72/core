@@ -57,7 +57,7 @@ use Symfony\Component\EventDispatcher\GenericEvent;
 use OC\Repair\MoveAvatarOutsideHome;
 use OC\Repair\RepairMismatchFileCachePath;
 
-class Repair implements IOutput{
+class Repair implements IOutput {
 	/* @var IRepairStep[] */
 	private $repairSteps;
 	/** @var EventDispatcher */
@@ -80,7 +80,7 @@ class Repair implements IOutput{
 	 * Run a series of repair steps for common problems
 	 */
 	public function run() {
-		if (count($this->repairSteps) === 0) {
+		if (\count($this->repairSteps) === 0) {
 			$this->emit('\OC\Repair', 'info', ['No repair steps available']);
 			return;
 		}
@@ -99,11 +99,11 @@ class Repair implements IOutput{
 	 * @throws \Exception
 	 */
 	public function addStep($repairStep) {
-		if (is_string($repairStep)) {
+		if (\is_string($repairStep)) {
 			try {
 				$s = \OC::$server->query($repairStep);
 			} catch (QueryException $e) {
-				if (class_exists($repairStep)) {
+				if (\class_exists($repairStep)) {
 					$s = new $repairStep();
 				} else {
 					throw new \Exception("Repair step '$repairStep' is unknown");
@@ -132,7 +132,8 @@ class Repair implements IOutput{
 			new RepairMismatchFileCachePath(
 				\OC::$server->getDatabaseConnection(),
 				\OC::$server->getMimeTypeLoader(),
-				\OC::$server->getLogger()),
+				\OC::$server->getLogger(),
+				\OC::$server->getConfig()),
 			new FillETags(\OC::$server->getDatabaseConnection()),
 			new CleanTags(\OC::$server->getDatabaseConnection(), \OC::$server->getUserManager()),
 			new DropOldTables(\OC::$server->getDatabaseConnection()),
@@ -194,14 +195,13 @@ class Repair implements IOutput{
 			new SqliteAutoincrement($connection),
 			new RepairOrphanedSubshare($connection),
 			new SearchLuceneTables(),
-			new Apps(\OC::$server->getAppManager(), \OC::$server->getEventDispatcher(), \OC::$server->getConfig(), new \OC_Defaults()),
 		];
 
 		//There is no need to delete all previews on every single update
 		//only 7.0.0 through 7.0.2 generated broken previews
 		$currentVersion = \OC::$server->getConfig()->getSystemValue('version');
-		if (version_compare($currentVersion, '7.0.0.0', '>=') &&
-			version_compare($currentVersion, '7.0.3.4', '<=')) {
+		if (\version_compare($currentVersion, '7.0.0.0', '>=') &&
+			\version_compare($currentVersion, '7.0.3.4', '<=')) {
 			$steps[] = new \OC\Repair\Preview();
 		}
 
@@ -214,7 +214,7 @@ class Repair implements IOutput{
 	 * @param array $arguments
 	 */
 	public function emit($scope, $method, array $arguments = []) {
-		if (!is_null($this->dispatcher)) {
+		if ($this->dispatcher !== null) {
 			$this->dispatcher->dispatch("$scope::$method",
 				new GenericEvent("$scope::$method", $arguments));
 		}

@@ -36,6 +36,7 @@ class LazyStorageMountInfo extends CachedMountInfo {
 	 * @param IMountPoint $mount
 	 */
 	public function __construct(IUser $user, IMountPoint $mount) {
+		parent::__construct($user, null, null, null);
 		$this->user = $user;
 		$this->mount = $mount;
 	}
@@ -45,7 +46,7 @@ class LazyStorageMountInfo extends CachedMountInfo {
 	 */
 	public function getStorageId() {
 		if (!$this->storageId) {
-			if (method_exists($this->mount, 'getStorageNumericId')) {
+			if (\method_exists($this->mount, 'getStorageNumericId')) {
 				$this->storageId = $this->mount->getStorageNumericId();
 			} else {
 				$storage = $this->mount->getStorage();

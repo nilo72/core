@@ -69,7 +69,7 @@
   RewriteRule ^\.well-known/caldav /remote.php/dav/ [R=301,L]
   RewriteRule ^remote/(.*) remote.php [QSA,L]
   RewriteRule ^(?:build|tests|config|lib|3rdparty|templates)/.* - [R=404,L]
-  RewriteCond %{REQUEST_URI} !^/.well-known/acme-challenge/.*
+  RewriteCond %{REQUEST_URI} !^/.well-known/(acme-challenge|pki-validation)/.*
   RewriteRule ^(?:\.|autotest|occ|issue|indie|db_|console).* - [R=404,L]
 </IfModule>
 <IfModule mod_mime.c>
@@ -85,3 +85,7 @@ Options -Indexes
   ModPagespeed Off
 </IfModule>
 
+#### DO NOT CHANGE ANYTHING ABOVE THIS LINE ####
+
+ErrorDocument 403 /core/templates/403.php
+ErrorDocument 404 /core/templates/404.php

@@ -33,12 +33,12 @@ class ConfigTest extends TestCase {
 
 		$this->randomTmpDir = \OC::$server->getTempManager()->getTemporaryFolder();
 		$this->configFile = $this->randomTmpDir.'testconfig.php';
-		file_put_contents($this->configFile, self::TESTCONTENT);
+		\file_put_contents($this->configFile, self::TESTCONTENT);
 		$this->config = new \OC\Config($this->randomTmpDir, 'testconfig.php');
 	}
 
 	protected function tearDown() {
-		unlink($this->configFile);
+		\unlink($this->configFile);
 		parent::tearDown();
 	}
 
@@ -58,7 +58,7 @@ class ConfigTest extends TestCase {
 
 	public function testGetValueReturnsEnvironmentValueIfSet() {
 		$this->assertEquals('bar', $this->config->getValue('foo'));
-		putenv('OC_foo=baz');
+		\putenv('OC_foo=baz');
 		$this->assertEquals('baz', $this->config->getValue('foo'));
 	}
 
@@ -120,6 +120,18 @@ class ConfigTest extends TestCase {
 		$this->assertAttributeEquals($this->initialConfig, 'cache', $this->config);
 		$this->assertStringEqualsFile($this->configFile, self::TESTCONTENT);
 
+		$calledBeforeUpdate = [];
+		\OC::$server->getEventDispatcher()->addListener('config.beforesetvalue',
+			function (GenericEvent $event) use (&$calledBeforeUpdate) {
+				$calledBeforeUpdate[] = 'config.beforesetvalue';
+				$calledBeforeUpdate[] = $event;
+			});
+		$calledAfterUpdate = [];
+		\OC::$server->getEventDispatcher()->addListener('config.aftersetvalue',
+			function (GenericEvent $event) use (&$calledAfterUpdate) {
+				$calledAfterUpdate[] = 'config.aftersetvalue';
+				$calledAfterUpdate[] = $event;
+			});
 		$this->config->setValues([
 			'foo'			=> 'moo',
 			'alcohol_free'	=> null,
@@ -128,10 +140,55 @@ class ConfigTest extends TestCase {
 		$expectedConfig['foo'] = 'moo';
 		unset($expectedConfig['alcohol_free']);
 		$this->assertAttributeEquals($expectedConfig, 'cache', $this->config);
+		$this->assertInstanceOf(GenericEvent::class, $calledBeforeUpdate[1]);
+		$this->assertInstanceOf(GenericEvent::class, $calledAfterUpdate[1]);
+		$this->assertEquals('config.beforesetvalue', $calledBeforeUpdate[0]);
+		$this->assertEquals('config.aftersetvalue', $calledAfterUpdate[0]);
+		$this->assertArrayHasKey('key', $calledBeforeUpdate[1]);
+		$this->assertEquals('foo', $calledBeforeUpdate[1]->getArgument('key'));
+		$this->assertArrayHasKey('value', $calledBeforeUpdate[1]);
+		$this->assertEquals('moo', $calledBeforeUpdate[1]->getArgument('value'));
+		$this->assertArrayHasKey('key', $calledAfterUpdate[1]);
+		$this->assertEquals('foo', $calledAfterUpdate[1]->getArgument('key'));
+		$this->assertArrayHasKey('value', $calledAfterUpdate[1]);
+		$this->assertEquals('moo', $calledAfterUpdate[1]->getArgument('value'));
+		$this->assertArrayHasKey('update', $calledAfterUpdate[1]);
+		$this->assertTrue($calledAfterUpdate[1]->getArgument('update'));
+		$this->assertArrayHasKey('oldvalue', $calledAfterUpdate[1]);
+		$this->assertEquals('bar', $calledAfterUpdate[1]->getArgument('oldvalue'));
 
 		$expected = "<?php\n\$CONFIG = array (\n  'foo' => 'moo',\n  'beers' => \n  array (\n    0 => 'Appenzeller',\n  " .
 			"  1 => 'Guinness',\n    2 => 'Kölsch',\n  ),\n);\n";
 		$this->assertStringEqualsFile($this->configFile, $expected);
+
+		$calledBeforeDelete = [];
+		\OC::$server->getEventDispatcher()->addListener('config.beforedeletevalue',
+			function (GenericEvent $event) use (&$calledBeforeDelete) {
+				$calledBeforeDelete[] = 'config.beforedeletevalue';
+				$calledBeforeDelete[] = $event;
+			});
+		$calledAfterDelete = [];
+		\OC::$server->getEventDispatcher()->addListener('config.afterdeletevalue',
+			function (GenericEvent $event) use (&$calledAfterDelete) {
+				$calledAfterDelete[] = 'config.afterdeletevalue';
+				$calledAfterDelete[] = $event;
+			});
+
+		$this->config->setValues([
+			'foo' => null
+		]);
+		$this->assertInstanceOf(GenericEvent::class, $calledBeforeDelete[1]);
+		$this->assertInstanceOf(GenericEvent::class, $calledAfterDelete[1]);
+		$this->assertEquals('config.beforedeletevalue', $calledBeforeDelete[0]);
+		$this->assertEquals('config.afterdeletevalue', $calledAfterDelete[0]);
+		$this->assertArrayHasKey('key', $calledBeforeDelete[1]);
+		$this->assertEquals('foo', $calledBeforeDelete[1]->getArgument('key'));
+		$this->assertArrayHasKey('value', $calledBeforeDelete[1]);
+		$this->assertNull($calledBeforeDelete[1]->getArgument('value'));
+		$this->assertArrayHasKey('key', $calledAfterDelete[1]);
+		$this->assertEquals('foo', $calledAfterDelete[1]->getArgument('key'));
+		$this->assertArrayHasKey('value', $calledAfterDelete[1]);
+		$this->assertEquals('moo', $calledAfterDelete[1]->getArgument('value'));
 	}
 
 	public function testDeleteKey() {
@@ -168,7 +225,7 @@ class ConfigTest extends TestCase {
 		// Create additional config
 		$additionalConfig = '<?php $CONFIG=array("php53"=>"totallyOutdated");';
 		$additionalConfigPath = $this->randomTmpDir.'additionalConfig.testconfig.php';
-		file_put_contents($additionalConfigPath, $additionalConfig);
+		\file_put_contents($additionalConfigPath, $additionalConfig);
 
 		// Reinstantiate the config to force a read-in of the additional configs
 		$this->config = new \OC\Config($this->randomTmpDir, 'testconfig.php');
@@ -185,7 +242,6 @@ class ConfigTest extends TestCase {
 		$this->assertStringEqualsFile($this->configFile, $expected);
 
 		// Cleanup
-		unlink($additionalConfigPath);
+		\unlink($additionalConfigPath);
 	}
-
 }

@@ -68,29 +68,25 @@ class Application extends App {
 		/**
 		 * Core
 		 */
-		$container->registerService('L10N', function(IContainer $c) {
+		$container->registerService('L10N', function (IContainer $c) {
 			return $c->query('ServerContainer')->getL10N($c->query('AppName'));
 		});
 
 		/**
 		 * Services
 		 */
-		$container->registerService('Tagger', function(IContainer $c)  {
-			return $c->query('ServerContainer')->getTagManager()->load('files');
-		});
-		$container->registerService('TagService', function(IContainer $c)  {
-			$homeFolder = $c->query('ServerContainer')->getUserFolder();
+		$container->registerService('TagService', function (IContainer $c) {
 			return new TagService(
 				$c->query('ServerContainer')->getUserSession(),
-				$c->query('Tagger'),
-				$homeFolder
+				$c->query('ServerContainer')->getTagManager(),
+				$c->query('ServerContainer')->getLazyRootFolder()
 			);
 		});
 
-		$container->registerService('OCP\Lock\ILockingProvider', function(IContainer $c)  {
+		$container->registerService('OCP\Lock\ILockingProvider', function (IContainer $c) {
 			return $c->query('ServerContainer')->getLockingProvider();
 		});
-		$container->registerService('OCP\Files\IMimeTypeLoader', function(IContainer $c)  {
+		$container->registerService('OCP\Files\IMimeTypeLoader', function (IContainer $c) {
 			return $c->query('ServerContainer')->getMimeTypeLoader();
 		});
 

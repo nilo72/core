@@ -18,7 +18,6 @@
  */
 namespace OCA\DAV\Upload;
 
-
 use OCA\DAV\Connector\Sabre\File;
 use Sabre\DAV\Exception\BadRequest;
 use Sabre\DAV\Server;
@@ -32,7 +31,7 @@ class ChunkingPluginZsync extends ServerPlugin {
 	private $server;
 	/** @var FutureFileZsync */
 	private $sourceNode;
-	/** @var OC\Files\View */
+	/** @var View */
 	private $view;
 
 	public function __construct(View $view) {
@@ -43,7 +42,7 @@ class ChunkingPluginZsync extends ServerPlugin {
 	/**
 	 * @inheritdoc
 	 */
-	function initialize(Server $server) {
+	public function initialize(Server $server) {
 		$server->on('beforeMove', [$this, 'beforeMove']);
 		$this->server = $server;
 	}
@@ -52,7 +51,7 @@ class ChunkingPluginZsync extends ServerPlugin {
 	 * @param string $sourcePath source path
 	 * @param string $destination destination path
 	 */
-	function beforeMove($sourcePath, $destination) {
+	public function beforeMove($sourcePath, $destination) {
 		$this->sourceNode = $this->server->tree->getNodeForPath($sourcePath);
 		if (!$this->sourceNode instanceof FutureFileZsync) {
 			// skip handling as the source is not a chunked FutureFileZsync
@@ -75,20 +74,20 @@ class ChunkingPluginZsync extends ServerPlugin {
 		try {
 			$node = $this->server->tree->getNodeForPath($destination);
 		} catch (NotFound $e) {
-			$node = $this->server->tree->getNodeForPath(dirname($destination));
+			$node = $this->server->tree->getNodeForPath(\dirname($destination));
 		}
 
 		// Disable if external storage used.
-		if (strpos($node->getDavPermissions(), 'M') === false) {
+		if (\strpos($node->getDavPermissions(), 'M') === false) {
 			$zsyncMetadataNode = $this->server->tree->getNodeForPath($path);
 			$zsyncMetadataHandle = $zsyncMetadataNode->get();
 
 			// get .zsync contents before its deletion
 			$zsyncMetadata = '';
-			while (!feof($zsyncMetadataHandle)) {
-				$zsyncMetadata .= fread($zsyncMetadataHandle, $zsyncMetadataNode->getSize());
+			while (!\feof($zsyncMetadataHandle)) {
+				$zsyncMetadata .= \fread($zsyncMetadataHandle, $zsyncMetadataNode->getSize());
 			}
-			fclose($zsyncMetadataHandle);
+			\fclose($zsyncMetadataHandle);
 
 			if ($this->server->tree->nodeExists($destination)) {
 				// set backingFile which is needed by AssemblyStreamZsync
@@ -110,9 +109,10 @@ class ChunkingPluginZsync extends ServerPlugin {
 	 * @param string $destination destination path
 	 */
 	private function postMoveZsync(&$zsyncMetadata, $destination) {
-		if (!$zsyncMetadata)
+		if (!$zsyncMetadata) {
 			return;
-		$destination = implode('/', array_slice(explode('/', $destination), 2));
+		}
+		$destination = \implode('/', \array_slice(\explode('/', $destination), 2));
 		$info = $this->view->getFileInfo('files/'.$destination);
 		$zsyncMetadataFile = 'files_zsync/'.$info->getId();
 		$this->view->file_put_contents($zsyncMetadataFile, $zsyncMetadata);
@@ -135,7 +135,7 @@ class ChunkingPluginZsync extends ServerPlugin {
 		$this->server->tree->nodeExists($destination) ? $response->setStatus(204) : $response->setStatus(201);
 
 		// copy the zsync metadata file contents, before it gets removed.
-		$zsyncMetadataPath = dirname($path).'/.zsync';
+		$zsyncMetadataPath = \dirname($path).'/.zsync';
 		$zsyncMetadata = $this->preMoveZsync($zsyncMetadataPath, $destination);
 
 		// do a move manually, skipping Sabre's default "delete" for existing nodes

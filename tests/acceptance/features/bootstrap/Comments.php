@@ -20,7 +20,7 @@
  *
  */
 
-use GuzzleHttp\Exception\BadResponseException;
+use Behat\Gherkin\Node\TableNode;
 
 require __DIR__ . '/../../../../lib/composer/autoload.php';
 
@@ -30,88 +30,89 @@ require __DIR__ . '/../../../../lib/composer/autoload.php';
 trait Comments {
 
 	/**
-	 * @var int 
+	 * @var int
 	 */
 	private $lastCommentId;
 	/**
-	 * @var int 
+	 * @var int
 	 */
 	private $lastFileId;
 
 	/**
-	 * @When /^user "([^"]*)" comments with content "([^"]*)" on (file|folder) "([^"]*)" using the API$/
-	 * @Given /^user "([^"]*)" has commented with content "([^"]*)" on (file|folder) "([^"]*)"$/
+	 * @When /^user "([^"]*)" comments with content "([^"]*)" on (?:file|folder) "([^"]*)" using the WebDAV API$/
+	 * @Given /^user "([^"]*)" has commented with content "([^"]*)" on (?:file|folder) "([^"]*)"$/
 	 *
 	 * @param string $user
 	 * @param string $content
-	 * @param string $type
 	 * @param string $path
 	 *
 	 * @return void
-	 * @throws \Exception
 	 */
-	public function userCommentsWithContentOnEntry($user, $content, $type, $path) {
+	public function userCommentsWithContentOnEntry($user, $content, $path) {
 		$fileId = $this->getFileIdForPath($user, $path);
 		$this->lastFileId = $fileId;
-		$commentsPath = '/comments/files/' . $fileId . '/';
-		try {
-			$this->response = $this->makeDavRequest(
-				$user,
-				"POST",
-				$commentsPath,
-				['Content-Type' => 'application/json',
-								   ],
-				null,
-				"uploads",
-				'{"actorId":"user0",
-								    "actorDisplayName":"user0",
-								    "actorType":"users",
-								    "verb":"comment",
-								    "message":"' . $content . '",
-								    "creationDateTime":"Thu, 18 Feb 2016 17:04:18 GMT",
-								    "objectType":"files"}'
-			);
-			$responseHeaders =  $this->response->getHeaders();
+		$commentsPath = "/comments/files/$fileId/";
+		$this->response = $this->makeDavRequest(
+			$user,
+			"POST",
+			$commentsPath,
+			['Content-Type' => 'application/json'],
+			null,
+			"uploads",
+			'{"actorId":"user0",
+			"actorDisplayName":"user0",
+			"actorType":"users",
+			"verb":"comment",
+			"message":"' . $content . '",
+			"creationDateTime":"Thu, 18 Feb 2016 17:04:18 GMT",
+			"objectType":"files"}'
+		);
+		$responseHeaders =  $this->response->getHeaders();
+		if (isset($responseHeaders['Content-Location'][0])) {
 			$commentUrl = $responseHeaders['Content-Location'][0];
-			$this->lastCommentId = substr($commentUrl, strrpos($commentUrl, '/') + 1);
-		} catch (BadResponseException $ex) {
-			$this->response = $ex->getResponse();
+			$this->lastCommentId = \substr(
+				$commentUrl, \strrpos($commentUrl, '/') + 1
+			);
 		}
 	}
 
 	/**
-	 * @Then /^user "([^"]*)" should have the following comments on (file|folder) "([^"]*)"$/
+	 * @When /^the user comments with content "([^"]*)" on (?:file|folder) "([^"]*)" using the WebDAV API$/
+	 * @Given /^the user has commented with content "([^"]*)" on (?:file|folder) "([^"]*)"$/
 	 *
-	 * @param string $user
-	 * @param string $type
+	 * @param string $content
 	 * @param string $path
-	 * @param \Behat\Gherkin\Node\TableNode|null $expectedElements
 	 *
 	 * @return void
 	 */
-	public function checkComments($user, $type, $path, $expectedElements) {
-		$fileId = $this->getFileIdForPath($user, $path);
-		$commentsPath = '/comments/files/' . $fileId . '/';
-		$properties = '<oc:limit>200</oc:limit><oc:offset>0</oc:offset>';
-		try {
-			$elementList = $this->reportElementComments(
-				$user, $commentsPath, $properties
-			);
-		} catch (BadResponseException $e) {
-			$this->response = $e->getResponse();
-			$statusCode = $this->response->getStatusCode();
-			PHPUnit_Framework_Assert::fail(
-				"checkComments failed to get comments for user $user path $path status $statusCode"
-			);
-		}
+	public function theUserCommentsWithContentOnEntry($content, $path) {
+		$this->userCommentsWithContentOnEntry($this->getCurrentUser(), $content, $path);
+	}
 
-		if ($expectedElements instanceof \Behat\Gherkin\Node\TableNode) {
+	/**
+	 * @Then /^user "([^"]*)" should have the following comments on (?:file|folder) "([^"]*)"$/
+	 *
+	 * @param string $user
+	 * @param string $path
+	 * @param TableNode|null $expectedElements
+	 *
+	 * @return void
+	 */
+	public function checkComments($user, $path, $expectedElements) {
+		$fileId = $this->getFileIdForPath($user, $path);
+		$commentsPath = "/comments/files/$fileId/";
+		$properties = '<oc:limit>200</oc:limit><oc:offset>0</oc:offset>';
+		$elementList = $this->reportElementComments(
+			$user, $commentsPath, $properties
+		);
+
+		if ($expectedElements instanceof TableNode) {
 			$elementRows = $expectedElements->getRows();
 			foreach ($elementRows as $expectedElement) {
 				$commentFound = false;
 				foreach ($elementList as $id => $answer) {
-					if (($answer[200]['{http://owncloud.org/ns}actorDisplayName'] === $expectedElement[0])
-						and ($answer[200]['{http://owncloud.org/ns}message'] === $expectedElement[1])
+					if (($expectedElement[0] === $answer[200]['{http://owncloud.org/ns}actorId'])
+						and ($expectedElement[1] === $answer[200]['{http://owncloud.org/ns}message'])
 					) {
 						$commentFound = true;
 						break;
@@ -125,33 +126,48 @@ trait Comments {
 	}
 
 	/**
-	 * @Then /^user "([^"]*)" should have (\d+) comments on (file|folder) "([^"]*)"$/
+	 * @Then /^the user should have the following comments on (?:file|folder) "([^"]*)"$/
+	 *
+	 * @param string $path
+	 * @param TableNode|null $expectedElements
+	 *
+	 * @return void
+	 */
+	public function checkCommentForCurrentUser($path, $expectedElements) {
+		$this->checkComments($this->getCurrentUser(), $path, $expectedElements);
+	}
+
+	/**
+	 * @Then /^user "([^"]*)" should have (\d+) comments on (?:file|folder) "([^"]*)"$/
 	 *
 	 * @param string $user
 	 * @param string $numberOfComments
-	 * @param string $type
 	 * @param string $path
 	 *
 	 * @return void
 	 */
-	public function checkNumberOfComments($user, $numberOfComments, $type, $path) {
+	public function checkNumberOfComments($user, $numberOfComments, $path) {
 		$fileId = $this->getFileIdForPath($user, $path);
-		$commentsPath = '/comments/files/' . $fileId . '/';
+		$commentsPath = "/comments/files/$fileId/";
 		$properties = '<oc:limit>200</oc:limit><oc:offset>0</oc:offset>';
-		try {
-			$elementList = $this->reportElementComments(
-				$user, $commentsPath, $properties
-			);
-			PHPUnit_Framework_Assert::assertCount(
-				(int) $numberOfComments, $elementList
-			);
-		} catch (BadResponseException $e) {
-			$this->response = $e->getResponse();
-			$statusCode = $this->response->getStatusCode();
-			PHPUnit_Framework_Assert::fail(
-				"checkNumberOfComments failed to get comments for user $user path $path status $statusCode"
-			);
-		}
+		$elementList = $this->reportElementComments(
+			$user, $commentsPath, $properties
+		);
+		PHPUnit_Framework_Assert::assertCount(
+			(int) $numberOfComments, $elementList
+		);
+	}
+
+	/**
+	 * @Then /^the user should have (\d+) comments on (?:file|folder) "([^"]*)"$/
+	 *
+	 * @param string $numberOfComments
+	 * @param string $path
+	 *
+	 * @return void
+	 */
+	public function checkNumberOfCommentsForCurrentUser($numberOfComments, $path) {
+		$this->checkNumberOfComments($this->getCurrentUser(), $numberOfComments, $path);
 	}
 
 	/**
@@ -162,32 +178,33 @@ trait Comments {
 	 * @return void
 	 */
 	public function deleteComment($user, $fileId, $commentId) {
-		$commentsPath = '/comments/files/' . $fileId . '/' . $commentId;
-		try {
-			$this->response = $this->makeDavRequest(
-				$user,
-				"DELETE",
-				$commentsPath,
-				[],
-				null,
-				"uploads",
-				null
-			);
-		} catch (BadResponseException $ex) {
-			$this->response = $ex->getResponse();
-		}
+		$commentsPath = "/comments/files/$fileId/$commentId";
+		$this->response = $this->makeDavRequest(
+			$user,
+			"DELETE",
+			$commentsPath,
+			[],
+			null,
+			"uploads",
+			null
+		);
 	}
 
 	/**
-	 * @When user :user deletes the last created comment using the API
+	 * @When user :user deletes the last created comment using the WebDAV API
+	 * @When the user deletes the last created comment using the WebDAV API
 	 * @Given user :user has deleted the last created comment
+	 * @Given the user has deleted the last created comment
 	 *
-	 * @param string $user
+	 * @param string $user | null
 	 *
 	 * @return void
 	 * @throws \Exception
 	 */
-	public function userDeletesLastComment($user) {
+	public function userDeletesLastComment($user=null) {
+		if ($user === null) {
+			$user = $this->getCurrentUser();
+		}
 		$this->deleteComment($user, $this->lastFileId, $this->lastCommentId);
 	}
 
@@ -204,7 +221,7 @@ trait Comments {
 		$keys = $this->response[0]['value'][2]['value'][0]['value'];
 		$found = false;
 		foreach ($keys as $singleKey) {
-			if ($singleKey['name'] === '{http://owncloud.org/ns}' . substr($key, 3)) {
+			if ($singleKey['name'] === '{http://owncloud.org/ns}' . \substr($key, 3)) {
 				if ($singleKey['value'] === $value) {
 					$found = true;
 				}
@@ -224,9 +241,9 @@ trait Comments {
 	 * @throws \Exception
 	 */
 	public function theResponseShouldContainOnlyComments($number) {
-		if (count($this->response) !== (int)$number) {
+		if (\count($this->response) !== (int)$number) {
 			throw new \Exception(
-				"Found more comments than $number (" . count($this->response) . ")"
+				"Found more comments than $number (" . \count($this->response) . ")"
 			);
 		}
 	}
@@ -240,31 +257,27 @@ trait Comments {
 	 * @return void
 	 */
 	public function editAComment($user, $content, $fileId, $commentId) {
-		$commentsPath = '/comments/files/' . $fileId . '/' . $commentId;
-		try {
-			$this->response = $this->makeDavRequest(
-				$user,
-				"PROPPATCH",
-				$commentsPath,
-				[],
-				null,
-				"uploads",
-				'<?xml version="1.0"?>
-									<d:propertyupdate  xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
-										<d:set>
-											<d:prop>
-												<oc:message>' . htmlspecialchars($content, ENT_XML1, 'UTF-8') . '</oc:message>
-											</d:prop>
-										</d:set>
-									</d:propertyupdate>'
-			);
-		} catch (BadResponseException $ex) {
-			$this->response = $ex->getResponse();
-		}
+		$commentsPath = "/comments/files/$fileId/$commentId";
+		$this->response = $this->makeDavRequest(
+			$user,
+			"PROPPATCH",
+			$commentsPath,
+			[],
+			null,
+			"uploads",
+			'<?xml version="1.0"?>
+				<d:propertyupdate  xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
+					<d:set>
+						<d:prop>
+							<oc:message>' . \htmlspecialchars($content, ENT_XML1, 'UTF-8') . '</oc:message>
+						</d:prop>
+					</d:set>
+				</d:propertyupdate>'
+		);
 	}
 
 	/**
-	 * @When /^user "([^"]*)" edits the last created comment with content "([^"]*)" using the API$/
+	 * @When /^user "([^"]*)" edits the last created comment with content "([^"]*)" using the WebDAV API$/
 	 * @Given /^user "([^"]*)" has edited the last created comment with content "([^"]*)"$/
 	 *
 	 * @param string $user
@@ -279,4 +292,44 @@ trait Comments {
 		);
 	}
 
+	/**
+	 * @When /^the user edits the last created comment with content "([^"]*)" using the WebDAV API$/
+	 * @Given /^the user has edited the last created comment with content "([^"]*)"$/
+	 *
+	 * @param string $content
+	 *
+	 * @return void
+	 * @throws \Exception
+	 */
+	public function theUserEditsLastCreatedComment($content) {
+		$this->editAComment(
+			$this->getCurrentUser(), $content, $this->lastFileId, $this->lastCommentId
+		);
+	}
+
+	/**
+	 * Returns the elements of a report command special for comments
+	 *
+	 * @param string $user
+	 * @param string $path
+	 * @param string $properties properties which needs to be included in the report
+	 *
+	 * @return array
+	 *
+	 * @throws Sabre\HTTP\ClientException, - in case a curl error occurred.
+	 */
+	public function reportElementComments($user, $path, $properties) {
+		$client = $this->getSabreClient($user);
+		
+		$body = '<?xml version="1.0" encoding="utf-8" ?>
+							 <oc:filter-comments xmlns:a="DAV:" xmlns:oc="http://owncloud.org/ns" >
+									' . $properties . '
+							 </oc:filter-comments>';
+		
+		$response = $client->request(
+			'REPORT', $this->makeSabrePathNotForFiles($path), $body
+		);
+		$parsedResponse = $client->parseMultistatus($response['body']);
+		return $parsedResponse;
+	}
 }

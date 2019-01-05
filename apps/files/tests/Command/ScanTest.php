@@ -117,8 +117,8 @@ class ScanTest extends TestCase {
 		);
 		$this->commandTester = new CommandTester($command);
 
-		$this->scanUser1 = $this->createUser('scanuser1' . uniqid());
-		$this->scanUser2 = $this->createUser('scanuser2' . uniqid());
+		$this->scanUser1 = $this->createUser('scanuser1' . \uniqid());
+		$this->scanUser2 = $this->createUser('scanuser2' . \uniqid());
 
 		$user1 = $this->createUser('user1');
 		$this->createUser('user2');
@@ -128,7 +128,7 @@ class ScanTest extends TestCase {
 
 		$this->dataDir = \OC::$server->getConfig()->getSystemValue('datadirectory', \OC::$SERVERROOT . '/data-autotest');
 
-		@mkdir($this->dataDir . '/' . $this->scanUser1->getUID() . '/files/toscan', 0777, true);
+		@\mkdir($this->dataDir . '/' . $this->scanUser1->getUID() . '/files/toscan', 0777, true);
 	}
 
 	protected function tearDown() {
@@ -140,8 +140,9 @@ class ScanTest extends TestCase {
 
 	public function dataInput() {
 		return [
-			[['--groups' => 'haystack'], 'Group name haystack doesn\'t exist'],
-			[['--groups' => 'group1'], 'Starting scan for user 1 out of 1 (user1)'],
+			[['--group' => ['haystack']], 'Group name haystack doesn\'t exist'],
+			[['--group' => ['haystack,barn']], 'Group name haystack,barn doesn\'t exist'],
+			[['--group' => ['group1']], 'Starting scan for user 1 out of 1 (user1)'],
 			[['user_id' => ['user1']], 'Starting scan for user 1 out of 1 (user1)'],
 			[['user_id' => ['user2']], 'Starting scan for user 1 out of 1 (user2)']
 		];
@@ -158,7 +159,7 @@ class ScanTest extends TestCase {
 
 	public function userInputData() {
 		return [
-			[['--groups' => 'group1'], 'Starting scan for user 1 out of 200']
+			[['--group' => ['group1']], 'Starting scan for user 1 out of 200']
 		];
 	}
 
@@ -171,7 +172,7 @@ class ScanTest extends TestCase {
 		//First we populate the users
 		$user = 'user';
 		$numberOfUsersInGroup = 210;
-		for($i = 2; $i <= 210; $i++) {
+		for ($i = 2; $i <= $numberOfUsersInGroup; $i++) {
 			$userObj = $this->createUser($user.$i);
 			$this->groupManager->get('group1')->addUser($userObj);
 		}
@@ -180,13 +181,13 @@ class ScanTest extends TestCase {
 		$output = $this->commandTester->getDisplay();
 		$this->assertContains($expectedOutput, $output);
 		//If pagination works then below assert shouldn't fail
-		$this->assertNotContains('Starting scan for user 1 out of 210', $output);
+		$this->assertNotContains("Starting scan for user 1 out of $numberOfUsersInGroup", $output);
 	}
 
 	public function multipleGroupTest() {
 		return [
-			[['--groups' => 'group1,group2'], ''],
-			[['--groups' => 'group1,group2,group3'], '']
+			[['--group' => ['group1,x','group2']], ''],
+			[['--group' => ['group1','group2,x','group3']], '']
 		];
 	}
 
@@ -194,12 +195,12 @@ class ScanTest extends TestCase {
 	 * @dataProvider multipleGroupTest
 	 * @param $input
 	 */
-	public  function testMultipleGroups($input) {
+	public function testMultipleGroups($input) {
 		//Create 10 users in each group
-		$groups = explode(',', $input['--groups']);
+		$groups = $input['--group'];
 		$user = "user";
 		$userObj = [];
-		for ($i = 1; $i <= (10 * count($groups)); $i++ ) {
+		for ($i = 1; $i <= (10 * \count($groups)); $i++) {
 			$userObj[] = $this->createUser($user.$i);
 		}
 
@@ -224,11 +225,11 @@ class ScanTest extends TestCase {
 
 		$this->commandTester->execute($input);
 		$output = $this->commandTester->getDisplay();
-		if (count($groups) === 2) {
+		if (\count($groups) === 2) {
 			$this->assertContains('Starting scan for user 1 out of 10 (user1)', $output);
 			$this->assertContains('Starting scan for user 1 out of 10 (user11)', $output);
 		}
-		if (count($groups) === 3) {
+		if (\count($groups) === 3) {
 			$this->assertContains('Starting scan for user 1 out of 10 (user1)', $output);
 			$this->assertContains('Starting scan for user 1 out of 10 (user11)', $output);
 			$this->assertContains('Starting scan for user 1 out of 10 (user21)', $output);
@@ -237,7 +238,7 @@ class ScanTest extends TestCase {
 	}
 
 	public function testScanAll() {
-		@mkdir($this->dataDir . '/' . $this->scanUser2->getUID() . '/files/toscan2', 0777, true);
+		@\mkdir($this->dataDir . '/' . $this->scanUser2->getUID() . '/files/toscan2', 0777, true);
 
 		$input = [
 			'--all' => true,
@@ -254,11 +255,10 @@ class ScanTest extends TestCase {
 		$storageId2 = $this->getStorageId('home::' . $this->scanUser2->getUID());
 		$entry2 = $this->getFileCacheEntry($storageId2, 'files/toscan2');
 		$this->assertEquals('files/toscan2', $entry2['path']);
-
 	}
 
 	public function testScanOne() {
-		@mkdir($this->dataDir . '/' . $this->scanUser2->getUID() . '/files/toscan2', 0777, true);
+		@\mkdir($this->dataDir . '/' . $this->scanUser2->getUID() . '/files/toscan2', 0777, true);
 
 		$input = [
 			'user_id' => [$this->scanUser2->getUID()],
@@ -353,7 +353,7 @@ class ScanTest extends TestCase {
 		$qb->select('*')
 			->from('filecache')
 			->where($qb->expr()->eq('storage', $qb->createNamedParameter($storageId)))
-			->andWhere($qb->expr()->eq('path_hash', $qb->createNamedParameter(md5($path))));
+			->andWhere($qb->expr()->eq('path_hash', $qb->createNamedParameter(\md5($path))));
 		$results = $qb->execute();
 		$result = $results->fetch();
 		$results->closeCursor();
@@ -394,7 +394,7 @@ class ScanTest extends TestCase {
 	 * Scan and repair a single user
 	 */
 	public function testRepairOne() {
-		@mkdir($this->dataDir . '/' . $this->scanUser2->getUID() . '/files/toscan3', 0777, true);
+		@\mkdir($this->dataDir . '/' . $this->scanUser2->getUID() . '/files/toscan3', 0777, true);
 		$input = [
 			'user_id' => [$this->scanUser2->getUID()],
 			'--repair' => true,
@@ -403,4 +403,3 @@ class ScanTest extends TestCase {
 		$this->assertEquals(0, $result);
 	}
 }
-

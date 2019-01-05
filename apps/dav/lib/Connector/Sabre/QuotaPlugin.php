@@ -29,7 +29,6 @@ use OCP\Files\StorageNotAvailableException;
 use Sabre\DAV\Exception\InsufficientStorage;
 use Sabre\DAV\Exception\ServiceUnavailable;
 use Sabre\DAV\INode;
-use Sabre\HTTP\URLUtil;
 
 /**
  * This plugin check user quota and deny creating files when they exceeds the quota.
@@ -71,7 +70,6 @@ class QuotaPlugin extends \Sabre\DAV\ServerPlugin {
 	 * @return void
 	 */
 	public function initialize(\Sabre\DAV\Server $server) {
-
 		$this->server = $server;
 
 		$server->on('beforeWriteContent', [$this, 'handleBeforeWriteContent'], 10);
@@ -97,7 +95,7 @@ class QuotaPlugin extends \Sabre\DAV\ServerPlugin {
 			$destinationNode = $this->server->tree->getNodeForPath($destination);
 			$path = $destinationNode->getPath();
 		} else {
-			$parentNode = $this->server->tree->getNodeForPath(dirname($destination));
+			$parentNode = $this->server->tree->getNodeForPath(\dirname($destination));
 			$path = $parentNode->getPath();
 		}
 
@@ -131,7 +129,7 @@ class QuotaPlugin extends \Sabre\DAV\ServerPlugin {
 		if (!$parent instanceof Node) {
 			return;
 		}
-		return $this->checkQuota($parent->getPath() . '/' . basename($uri));
+		return $this->checkQuota($parent->getPath() . '/' . \basename($uri));
 	}
 
 	/**
@@ -147,8 +145,8 @@ class QuotaPlugin extends \Sabre\DAV\ServerPlugin {
 			$length = $this->getLength();
 		}
 		if ($length) {
-			list($parentPath, $newName) = URLUtil::splitPath($path);
-			if(is_null($parentPath)) {
+			list($parentPath, $newName) = \Sabre\Uri\split($path);
+			if ($parentPath === null) {
 				$parentPath = '';
 			}
 			$req = $this->server->httpRequest;
@@ -159,7 +157,7 @@ class QuotaPlugin extends \Sabre\DAV\ServerPlugin {
 				// there is still enough space for the remaining chunks
 				$length -= $chunkHandler->getCurrentSize();
 				// use target file name for free space check in case of shared files
-				$path = rtrim($parentPath, '/') . '/' . $info['name'];
+				$path = \rtrim($parentPath, '/') . '/' . $info['name'];
 			}
 			$freeSpace = $this->getFreeSpace($path);
 			if ($freeSpace !== FileInfo::SPACE_UNKNOWN && $freeSpace !== FileInfo::SPACE_UNLIMITED && $length > $freeSpace) {
@@ -180,14 +178,14 @@ class QuotaPlugin extends \Sabre\DAV\ServerPlugin {
 	public function getLength() {
 		$req = $this->server->httpRequest;
 		$length = $req->getHeader('X-Expected-Entity-Length');
-		if (!is_numeric($length)) {
+		if (!\is_numeric($length)) {
 			$length = $req->getHeader('Content-Length');
-			$length = is_numeric($length) ? $length : null;
+			$length = \is_numeric($length) ? $length : null;
 		}
 
 		$ocLength = $req->getHeader('OC-Total-Length');
-		if (is_numeric($length) && is_numeric($ocLength)) {
-			return max($length, $ocLength);
+		if (\is_numeric($length) && \is_numeric($ocLength)) {
+			return \max($length, $ocLength);
 		}
 
 		return $length;
@@ -200,7 +198,7 @@ class QuotaPlugin extends \Sabre\DAV\ServerPlugin {
 	 */
 	public function getFreeSpace($uri) {
 		try {
-			$freeSpace = $this->view->free_space(ltrim($uri, '/'));
+			$freeSpace = $this->view->free_space(\ltrim($uri, '/'));
 			return $freeSpace;
 		} catch (StorageNotAvailableException $e) {
 			throw new ServiceUnavailable($e->getMessage());

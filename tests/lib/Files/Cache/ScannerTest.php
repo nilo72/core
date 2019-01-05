@@ -10,6 +10,7 @@ namespace Test\Files\Cache;
 
 use OC\Files\Cache\CacheEntry;
 use OC\Files\Storage\Storage;
+use OC\Files\Utils\FileUtils;
 use OCA\Files_Sharing\ISharedStorage;
 use OCP\Files\IHomeStorage;
 use OCP\Files\Storage\ILockingStorage;
@@ -53,37 +54,37 @@ class ScannerTest extends \Test\TestCase {
 		parent::tearDown();
 	}
 
-	function testFile() {
+	public function testFile() {
 		$data = "dummy file data\n";
 		$this->storage->file_put_contents('foo.txt', $data);
 		$this->scanner->scanFile('foo.txt');
 
 		$this->assertTrue($this->cache->inCache('foo.txt'));
 		$cachedData = $this->cache->get('foo.txt');
-		$this->assertEquals($cachedData['size'], strlen($data));
+		$this->assertEquals($cachedData['size'], \strlen($data));
 		$this->assertEquals($cachedData['mimetype'], 'text/plain');
 		$this->assertNotEquals($cachedData['parent'], -1); //parent folders should be scanned automatically
 
-		$data = file_get_contents(\OC::$SERVERROOT . '/core/img/logo.png');
+		$data = \file_get_contents(\OC::$SERVERROOT . '/core/img/logo.png');
 		$this->storage->file_put_contents('foo.png', $data);
 		$this->scanner->scanFile('foo.png');
 
 		$this->assertTrue($this->cache->inCache('foo.png'));
 		$cachedData = $this->cache->get('foo.png');
-		$this->assertEquals($cachedData['size'], strlen($data));
+		$this->assertEquals($cachedData['size'], \strlen($data));
 		$this->assertEquals($cachedData['mimetype'], 'image/png');
 	}
 
 	private function fillTestFolders() {
 		$textData = "dummy file data\n";
-		$imgData = file_get_contents(\OC::$SERVERROOT . '/core/img/logo.png');
+		$imgData = \file_get_contents(\OC::$SERVERROOT . '/core/img/logo.png');
 		$this->storage->mkdir('folder');
 		$this->storage->file_put_contents('foo.txt', $textData);
 		$this->storage->file_put_contents('foo.png', $imgData);
 		$this->storage->file_put_contents('folder/bar.txt', $textData);
 	}
 
-	function testFolder() {
+	public function testFolder() {
 		$this->fillTestFolders();
 
 		$this->scanner->scan('');
@@ -105,7 +106,7 @@ class ScannerTest extends \Test\TestCase {
 		$this->assertEquals($cachedDataFolder2['size'], $cachedDataText2['size']);
 	}
 
-	function testShallow() {
+	public function testShallow() {
 		$this->fillTestFolders();
 
 		$this->scanner->scan('', \OC\Files\Cache\Scanner::SCAN_SHALLOW);
@@ -133,7 +134,7 @@ class ScannerTest extends \Test\TestCase {
 		$this->assertNotEquals($cachedDataFolder['size'], -1);
 	}
 
-	function testBackgroundScan() {
+	public function testBackgroundScan() {
 		$this->fillTestFolders();
 		$this->storage->mkdir('folder2');
 		$this->storage->file_put_contents('folder2/bar.txt', 'foobar');
@@ -155,7 +156,7 @@ class ScannerTest extends \Test\TestCase {
 		$this->assertFalse($this->cache->getIncomplete());
 	}
 
-	function testBackgroundScanOnlyRecurseIncomplete() {
+	public function testBackgroundScanOnlyRecurseIncomplete() {
 		$this->fillTestFolders();
 		$this->storage->mkdir('folder2');
 		$this->storage->file_put_contents('folder2/bar.txt', 'foobar');
@@ -323,28 +324,6 @@ class ScannerTest extends \Test\TestCase {
 
 		$cachedData = $this->cache->get('folder/bar.txt');
 		$this->assertEquals($newFolderId, $cachedData['parent']);
-	}
-
-	/**
-	 * @dataProvider dataTestIsPartialFile
-	 *
-	 * @param string $path
-	 * @param bool $expected
-	 */
-	public function testIsPartialFile($path, $expected) {
-		$this->assertSame($expected,
-			$this->scanner->isPartialFile($path)
-		);
-	}
-
-	public function dataTestIsPartialFile() {
-		return [
-			['foo.txt.part', true],
-			['/sub/folder/foo.txt.part', true],
-			['/sub/folder.part/foo.txt', true],
-			['foo.txt', false],
-			['/sub/folder/foo.txt', false],
-		];
 	}
 
 	public function failGetDataProvider() {

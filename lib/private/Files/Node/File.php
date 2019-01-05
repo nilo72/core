@@ -57,7 +57,9 @@ class File extends Node implements \OCP\Files\File, IPreviewNode {
 	}
 
 	/**
-	 * @param string $data
+	 * Write the contents of data into this file node. It can be a whole
+	 * string or a stream resource
+	 * @param string|resource $data
 	 * @throws \OCP\Files\NotPermittedException
 	 */
 	public function putContent($data) {
@@ -118,7 +120,6 @@ class File extends Node implements \OCP\Files\File, IPreviewNode {
 			$this->view->unlink($this->path);
 			$nonExisting = new NonExistingFile($this->root, $this->view, $this->path, $fileInfo);
 			$this->root->emit('\OC\Files', 'postDelete', [$nonExisting]);
-			$this->exists = false;
 			$this->fileInfo = null;
 		} else {
 			throw new NotPermittedException();
@@ -147,11 +148,11 @@ class File extends Node implements \OCP\Files\File, IPreviewNode {
 	 * @since 10.1.0
 	 */
 	public function getThumbnail($options) {
-		$maxX = array_key_exists('x', $options) ? (int)$options['x'] : 32;
-		$maxY = array_key_exists('y', $options) ? (int)$options['y'] : 32;
-		$scalingUp = array_key_exists('scalingup', $options) ? (bool)$options['scalingup'] : true;
-		$keepAspect = array_key_exists('a', $options) ? true : false;
-		$mode = array_key_exists('mode', $options) ? $options['mode'] : 'fill';
+		$maxX = \array_key_exists('x', $options) ? (int)$options['x'] : 32;
+		$maxY = \array_key_exists('y', $options) ? (int)$options['y'] : 32;
+		$scalingUp = \array_key_exists('scalingup', $options) ? (bool)$options['scalingup'] : true;
+		$keepAspect = \array_key_exists('a', $options) ? true : false;
+		$mode = \array_key_exists('mode', $options) ? $options['mode'] : 'fill';
 
 		$preview = new \OC\Preview();
 		$preview->setFile($this);
@@ -160,7 +161,7 @@ class File extends Node implements \OCP\Files\File, IPreviewNode {
 		$preview->setScalingUp($scalingUp);
 		$preview->setMode($mode);
 		$preview->setKeepAspect($keepAspect);
-		if (array_key_exists('mimeType', $options)) {
+		if (\array_key_exists('mimeType', $options)) {
 			$preview->setMimetype($options['mimeType']);
 		}
 		return $preview->getPreview();

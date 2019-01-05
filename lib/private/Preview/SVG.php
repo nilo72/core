@@ -24,6 +24,7 @@
 namespace OC\Preview;
 
 use OCP\Files\File;
+use OCP\Files\FileInfo;
 use OCP\Preview\IProvider2;
 
 class SVG implements IProvider2 {
@@ -43,14 +44,14 @@ class SVG implements IProvider2 {
 			$svg->setBackgroundColor(new \ImagickPixel('transparent'));
 
 			$stream = $file->fopen('r');
-			$content = stream_get_contents($stream);
-			if (substr($content, 0, 5) !== '<?xml') {
+			$content = \stream_get_contents($stream);
+			if (\substr($content, 0, 5) !== '<?xml') {
 				$content = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>' . $content;
 			}
-			fclose($stream);
+			\fclose($stream);
 
 			// Do not parse SVG files with references
-			if (stripos($content, 'xlink:href') !== false) {
+			if (\stripos($content, 'xlink:href') !== false) {
 				return false;
 			}
 
@@ -76,7 +77,7 @@ class SVG implements IProvider2 {
 	/**
 	 * @inheritdoc
 	 */
-	public function isAvailable(File $file) {
+	public function isAvailable(FileInfo $file) {
 		return true;
 	}
 }

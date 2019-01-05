@@ -21,7 +21,7 @@
 
 require __DIR__ . '/../../../../lib/composer/autoload.php';
 
-use GuzzleHttp\Client;
+use TestHelpers\HttpRequestHelper;
 
 /**
  * Checksum functions
@@ -29,7 +29,7 @@ use GuzzleHttp\Client;
 trait Checksums {
 
 	/**
-	 * @When user :user uploads file :source to :destination with checksum :checksum using the API
+	 * @When user :user uploads file :source to :destination with checksum :checksum using the WebDAV API
 	 * @Given user :user has uploaded file :source to :destination with checksum :checksum
 	 *
 	 * @param string $user
@@ -42,13 +42,42 @@ trait Checksums {
 	public function userUploadsFileToWithChecksumUsingTheAPI(
 		$user, $source, $destination, $checksum
 	) {
-		$file = \GuzzleHttp\Stream\Stream::factory(fopen($source, 'r'));
+		$file = \GuzzleHttp\Stream\Stream::factory(
+			\fopen(
+				$this->acceptanceTestsDirLocation() . $source,
+				'r'
+			)
+		);
 		$this->response = $this->makeDavRequest(
 			$user,
 			'PUT',
 			$destination,
 			['OC-Checksum' => $checksum],
 			$file,
+			"files"
+		);
+	}
+
+	/**
+	 * @When user :user uploads file with content :content and checksum :checksum to :destination using the WebDAV API
+	 * @Given user :user has uploaded file with content :content and checksum :checksum to :destination
+	 *
+	 * @param string $user
+	 * @param string $content
+	 * @param string $checksum
+	 * @param string $destination
+	 *
+	 * @return void
+	 */
+	public function userUploadsFileWithContentAndChecksumToUsingTheAPI(
+		$user, $content, $checksum, $destination
+	) {
+		$this->response = $this->makeDavRequest(
+			$user,
+			'PUT',
+			$destination,
+			['OC-Checksum' => $checksum],
+			$content,
 			"files"
 		);
 	}
@@ -78,21 +107,16 @@ trait Checksums {
 	 * @return void
 	 */
 	public function userRequestsTheChecksumOfViaPropfind($user, $path) {
-		$client = new Client();
-		$request = $client->createRequest(
-			'PROPFIND',
-			$this->getBaseUrl() . '/' . $this->getDavFilesPath($user) . $path,
-			[
-				'body' => '<?xml version="1.0"?>
+		$body = '<?xml version="1.0"?>
 <d:propfind  xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
   <d:prop>
     <oc:checksums />
   </d:prop>
-</d:propfind>',
-				'auth' => $this->getAuthOptionForUser($user)
-			]
+</d:propfind>';
+		$url = $this->getBaseUrl() . '/' . $this->getDavFilesPath($user) . $path;
+		$this->response = HttpRequestHelper::sendRequest(
+			$url, 'PROPFIND', $user, $this->getPasswordForUser($user), null, $body
 		);
-		$this->response = $client->send($request);
 	}
 
 	/**
@@ -113,11 +137,25 @@ trait Checksums {
 		 */
 		$checksums = $parsed[0]['value'][1]['value'][0]['value'][0];
 
-		if ($checksums['value'][0]['value'] !== $checksum) {
+		if ($checksum !== $checksums['value'][0]['value']) {
 			throw new \Exception(
 				"Expected $checksum, got " . $checksums['value'][0]['value']
 			);
 		}
+	}
+
+	/**
+	 * @Then as user :user the webdav checksum of :path via propfind should match :checksum
+	 *
+	 * @param string $user
+	 * @param string $path
+	 * @param string $checksum
+	 *
+	 * @return void
+	 */
+	public function theWebdavChecksumOfViaPropfindShouldMatch($user, $path, $checksum) {
+		$this->userRequestsTheChecksumOfViaPropfind($user, $path);
+		$this->theWebdavChecksumShouldMatch($checksum);
 	}
 
 	/**
@@ -131,7 +169,8 @@ trait Checksums {
 	public function theHeaderChecksumShouldMatch($checksum) {
 		if ($this->response->getHeader('OC-Checksum') !== $checksum) {
 			throw new \Exception(
-				"Expected $checksum, got " . $this->response->getHeader('OC-Checksum')
+				"Expected $checksum, got "
+				. $this->response->getHeader('OC-Checksum')
 			);
 		}
 	}
@@ -140,6 +179,7 @@ trait Checksums {
 	 * @Then the webdav checksum should be empty
 	 *
 	 * @return void
+	 * @throws \Exception
 	 */
 	public function theWebdavChecksumShouldBeEmpty() {
 		$service = new Sabre\Xml\Service();
@@ -153,7 +193,7 @@ trait Checksums {
 
 		if ($status !== 'HTTP/1.1 404 Not Found') {
 			throw new \Exception(
-				"Expected 'HTTP/1.1 404 Not Found', got " . $status
+				"Expected 'HTTP/1.1 404 Not Found', got $status"
 			);
 		}
 	}
@@ -162,17 +202,19 @@ trait Checksums {
 	 * @Then the OC-Checksum header should not be there
 	 *
 	 * @return void
+	 * @throws \Exception
 	 */
 	public function theOcChecksumHeaderShouldNotBeThere() {
 		if ($this->response->hasHeader('OC-Checksum')) {
 			throw new \Exception(
-				"Expected no checksum header but got " . $this->response->getHeader('OC-Checksum')
+				"Expected no checksum header but got "
+				. $this->response->getHeader('OC-Checksum')
 			);
 		}
 	}
 
 	/**
-	 * @When user :user uploads chunk file :num of :total with :data to :destination with checksum :checksum using the API
+	 * @When user :user uploads chunk file :num of :total with :data to :destination with checksum :checksum using the WebDAV API
 	 * @Given user :user has uploaded chunk file :num of :total with :data to :destination with checksum :checksum
 	 *
 	 * @param string $user
@@ -187,20 +229,16 @@ trait Checksums {
 	public function userUploadsChunkFileOfWithToWithChecksum(
 		$user, $num, $total, $data, $destination, $checksum
 	) {
-		try {
-			$num -= 1;
-			$data = \GuzzleHttp\Stream\Stream::factory($data);
-			$file = $destination . '-chunking-42-' . $total . '-' . $num;
-			$this->response = $this->makeDavRequest(
-				$user,
-				'PUT',
-				$file,
-				['OC-Checksum' => $checksum, 'OC-Chunked' => '1'],
-				$data,
-				"files"
-			);
-		} catch (\GuzzleHttp\Exception\RequestException $ex) {
-			$this->response = $ex->getResponse();
-		}
+		$num -= 1;
+		$data = \GuzzleHttp\Stream\Stream::factory($data);
+		$file = "$destination-chunking-42-$total-$num";
+		$this->response = $this->makeDavRequest(
+			$user,
+			'PUT',
+			$file,
+			['OC-Checksum' => $checksum, 'OC-Chunked' => '1'],
+			$data,
+			"files"
+		);
 	}
 }

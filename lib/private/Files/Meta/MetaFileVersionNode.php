@@ -21,6 +21,7 @@
 
 namespace OC\Files\Meta;
 
+use OC\Files\Filesystem;
 use OC\Files\Node\AbstractFile;
 use OC\Files\Node\File;
 use OCP\Files\ForbiddenException;
@@ -64,7 +65,7 @@ class MetaFileVersionNode extends AbstractFile implements IPreviewNode, IProvide
 	 */
 	public function __construct(MetaVersionCollection $parent,
 								IRootFolder $root,
-								array $version, Storage $storage, $internalPath) {
+								array $version, Storage\IStorage $storage, $internalPath) {
 		$this->parent = $parent;
 		$this->versionId = $version['version'];
 		$this->versionInfo = $version;
@@ -92,8 +93,8 @@ class MetaFileVersionNode extends AbstractFile implements IPreviewNode, IProvide
 	 */
 	public function getContent() {
 		$handle = $this->fopen('r+');
-		$data = stream_get_contents($handle);
-		fclose($handle);
+		$data = \stream_get_contents($handle);
+		\fclose($handle);
 
 		return $data;
 	}
@@ -141,7 +142,7 @@ class MetaFileVersionNode extends AbstractFile implements IPreviewNode, IProvide
 	 * @inheritdoc
 	 */
 	public function getContentDispositionFileName() {
-		return basename($this->internalPath);
+		return \basename($this->internalPath);
 	}
 
 	public function getId() {
@@ -152,17 +153,21 @@ class MetaFileVersionNode extends AbstractFile implements IPreviewNode, IProvide
 		return $this->parent->getPath() . '/' . $this->getName();
 	}
 
+	public function getMountPoint() {
+		return Filesystem::getMountManager()->find($this->versionInfo['path']);
+	}
+
 	/**
 	 * @param array $options
 	 * @return IImage
 	 * @since 10.1.0
 	 */
 	public function getThumbnail($options) {
-		$maxX = array_key_exists('x', $options) ? (int)$options['x'] : 32;
-		$maxY = array_key_exists('y', $options) ? (int)$options['y'] : 32;
-		$scalingUp = array_key_exists('scalingup', $options) ? (bool)$options['scalingup'] : true;
-		$keepAspect = array_key_exists('a', $options) ? true : false;
-		$mode = array_key_exists('mode', $options) ? $options['mode'] : 'fill';
+		$maxX = \array_key_exists('x', $options) ? (int)$options['x'] : 32;
+		$maxY = \array_key_exists('y', $options) ? (int)$options['y'] : 32;
+		$scalingUp = \array_key_exists('scalingup', $options) ? (bool)$options['scalingup'] : true;
+		$keepAspect = \array_key_exists('a', $options) ? true : false;
+		$mode = \array_key_exists('mode', $options) ? $options['mode'] : 'fill';
 
 		$preview = new Preview();
 		$preview->setFile($this, $this->versionId);

@@ -34,7 +34,7 @@ class ZsyncPlugin extends ServerPlugin {
 	// namespace
 	const ZSYNC_PROPERTYNAME = '{http://owncloud.org/ns}zsync';
 
-	/** @var OC\Files\View */
+	/** @var View */
 	private $view;
 
 	public function __construct(View $view) {
@@ -48,7 +48,7 @@ class ZsyncPlugin extends ServerPlugin {
 	 * @param Server $server
 	 * @return void
 	 */
-	function initialize(Server $server) {
+	public function initialize(Server $server) {
 		$server->on('method:GET', [$this, 'httpGet'], 90);
 		$server->on('method:DELETE', [$this, 'httpDelete'], 90);
 		$server->on('propFind', [$this, 'handleGetProperties']);
@@ -60,16 +60,15 @@ class ZsyncPlugin extends ServerPlugin {
 	 * @param RequestInterface $request
 	 * @param ResponseInterface $response
 	 */
-	function httpGet(RequestInterface $request, ResponseInterface $response) {
-
+	public function httpGet(RequestInterface $request, ResponseInterface $response) {
 		$queryParams = $request->getQueryParameters();
-		if (!array_key_exists('zsync', $queryParams)) {
+		if (!\array_key_exists('zsync', $queryParams)) {
 			return true;
 		}
 
-		$path = ltrim($request->getPath(), '/');
+		$path = \ltrim($request->getPath(), '/');
 		/* remove files/$user */
-		$path = implode('/', array_slice(explode('/', $path), 2));
+		$path = \implode('/', \array_slice(\explode('/', $path), 2));
 		/* If basefile not found this is an error */
 		if (!$this->view->file_exists('files/'.$path)) {
 			$response->setStatus(Http::STATUS_NOT_FOUND);
@@ -96,16 +95,15 @@ class ZsyncPlugin extends ServerPlugin {
 	 * @param RequestInterface $request
 	 * @param ResponseInterface $response
 	 */
-	function httpDelete(RequestInterface $request, ResponseInterface $response) {
-
+	public function httpDelete(RequestInterface $request, ResponseInterface $response) {
 		$queryParams = $request->getQueryParameters();
-		if (!array_key_exists('zsync', $queryParams)) {
+		if (!\array_key_exists('zsync', $queryParams)) {
 			return true;
 		}
 
-		$path = ltrim($request->getPath(), '/');
+		$path = \ltrim($request->getPath(), '/');
 		/* remove files/$user */
-		$path = implode('/', array_slice(explode('/', $path), 2));
+		$path = \implode('/', \array_slice(\explode('/', $path), 2));
 		/* If basefile not found this is an error */
 		if (!$this->view->file_exists('files/'.$path)) {
 			$response->setStatus(Http::STATUS_NOT_FOUND);
@@ -133,12 +131,13 @@ class ZsyncPlugin extends ServerPlugin {
 	 */
 	public function handleGetProperties(PropFind $propFind, \Sabre\DAV\INode $node) {
 		if ($node instanceof \OCA\DAV\Connector\Sabre\File) {
-			if (!$this->view->is_file('files/'.$node->getPath()))
+			if (!$this->view->is_file('files/'.$node->getPath())) {
 				return;
+			}
 			$info = $this->view->getFileInfo('files/'.$node->getPath());
 			$zsyncMetadataFile = 'files_zsync/'.$info->getId();
 			if ($this->view->file_exists($zsyncMetadataFile)) {
-				$propFind->handle(self::ZSYNC_PROPERTYNAME, function() use ($node) {
+				$propFind->handle(self::ZSYNC_PROPERTYNAME, function () {
 					return 'true';
 				});
 			}

@@ -27,6 +27,7 @@
 namespace OC\Preview;
 
 use OCP\Files\File;
+use OCP\Files\FileInfo;
 use OCP\Preview\IProvider2;
 
 abstract class Image implements IProvider2 {
@@ -47,7 +48,7 @@ abstract class Image implements IProvider2 {
 
 		$image->loadFromFileHandle($stream);
 		$image->fixOrientation();
-		fclose($stream);
+		\fclose($stream);
 		if ($image->valid()) {
 			$image->scaleDownToFit($maxX, $maxY);
 
@@ -59,7 +60,7 @@ abstract class Image implements IProvider2 {
 	/**
 	 * @inheritdoc
 	 */
-	public function isAvailable(File $file) {
+	public function isAvailable(FileInfo $file) {
 		return true;
 	}
 }

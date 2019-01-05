@@ -113,12 +113,12 @@ class ViewController extends Controller {
 		$content = '';
 		$appPath = \OC_App::getAppPath($appName);
 		$scriptPath = $appPath . '/' . $scriptName;
-		if (file_exists($scriptPath)) {
+		if (\file_exists($scriptPath)) {
 			// TODO: sanitize path / script name ?
-			ob_start();
+			\ob_start();
 			include $scriptPath;
-			$content = ob_get_contents();
-			@ob_end_clean();
+			$content = \ob_get_contents();
+			@\ob_end_clean();
 		}
 		return $content;
 	}
@@ -143,11 +143,11 @@ class ViewController extends Controller {
 	 * @param string $fileid
 	 * @return TemplateResponse
 	 */
-	public function index($dir = '', $view = '', $fileid = null) {
+	public function index($dir = '', $view = '', $fileid = null, $details = null) {
 		$fileNotFound = false;
 		if ($fileid !== null) {
 			try {
-				return $this->showFile($fileid);
+				return $this->showFile($fileid, $details);
 			} catch (NotFoundException $e) {
 				$fileNotFound = true;
 			}
@@ -173,12 +173,14 @@ class ViewController extends Controller {
 		\OCP\Util::addScript('files', 'favoritesfilelist');
 		\OCP\Util::addScript('files', 'tagsplugin');
 		\OCP\Util::addScript('files', 'favoritesplugin');
+		\OCP\Util::addScript('files', 'filelockplugin');
 
 		\OCP\Util::addScript('files', 'detailfileinfoview');
 		\OCP\Util::addScript('files', 'detailtabview');
 		\OCP\Util::addScript('files', 'mainfileinfodetailview');
 		\OCP\Util::addScript('files', 'detailsview');
 		\OCP\Util::addStyle('files', 'detailsView');
+		\OCP\Util::addScript('files', 'locktabview');
 
 		\OC_Util::addVendorScript('core', 'handlebars/handlebars');
 
@@ -195,7 +197,7 @@ class ViewController extends Controller {
 			$view = !empty($view) ? $view : 'files';
 			$hash = '#?dir=' . \OCP\Util::encodePath($dir);
 			if ($view !== 'files') {
-				$hash .= '&view=' . urlencode($view);
+				$hash .= '&view=' . \urlencode($view);
 			}
 			return new RedirectResponse($this->urlGenerator->linkToRoute('files.view.index') . $hash);
 		}
@@ -217,11 +219,11 @@ class ViewController extends Controller {
 		$user = $this->userSession->getUser()->getUID();
 
 		$navItems = \OCA\Files\App::getNavigationManager()->getAll();
-		usort($navItems, function($item1, $item2) {
+		\usort($navItems, function ($item1, $item2) {
 			return $item1['order'] - $item2['order'];
 		});
 		$nav->assign('navigationItems', $navItems);
-		$nav->assign('webdavUrl', $this->urlGenerator->getAbsoluteUrl($this->urlGenerator->linkTo('', 'remote.php') . '/dav/files/' . rawurlencode($user) . '/'));
+		$nav->assign('webdavUrl', $this->urlGenerator->getAbsoluteUrl($this->urlGenerator->linkTo('', 'remote.php') . '/dav/files/' . \rawurlencode($user) . '/'));
 
 		$contentItems = [];
 
@@ -278,7 +280,7 @@ class ViewController extends Controller {
 	 * @NoCSRFRequired
 	 * @NoAdminRequired
 	 */
-	public function showFile($fileId) {
+	public function showFile($fileId, $details = null) {
 		$uid = $this->userSession->getUser()->getUID();
 		$baseFolder = $this->rootFolder->get($uid . '/files/');
 		$files = $baseFolder->getById($fileId);
@@ -298,7 +300,7 @@ class ViewController extends Controller {
 			$webUrl = $event->getArgument('resolvedWebLink');
 			$webdavUrl = $event->getArgument('resolvedDavLink');
 		} else {
-			$file = current($files);
+			$file = \current($files);
 			if ($file instanceof Folder) {
 				// set the full path to enter the folder
 				$params['dir'] = $baseFolder->getRelativePath($file->getPath());
@@ -308,10 +310,13 @@ class ViewController extends Controller {
 				// and scroll to the entry
 				$params['scrollto'] = $file->getName();
 			}
+			if ($details !== null) {
+				$params['details'] = $details;
+			}
 			$webUrl = $this->urlGenerator->linkToRoute('files.view.index', $params);
 
-			$webdavUrl = $this->urlGenerator->linkTo('', 'remote.php') . '/dav/files/' . rawurlencode($uid) . '/';
-			$webdavUrl .= \OCP\Util::encodePath(ltrim($baseFolder->getRelativePath($file->getPath()), '/'));
+			$webdavUrl = $this->urlGenerator->linkTo('', 'remote.php') . '/dav/files/' . \rawurlencode($uid) . '/';
+			$webdavUrl .= \OCP\Util::encodePath(\ltrim($baseFolder->getRelativePath($file->getPath()), '/'));
 		}
 
 		if ($webUrl) {

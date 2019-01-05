@@ -19,7 +19,6 @@
  *
  */
 
-
 namespace OCP\Files\ObjectStore;
 
 /**
@@ -27,7 +26,7 @@ namespace OCP\Files\ObjectStore;
  * object living in an object store
  *
  * @package OCP\Files\ObjectStore
- * @since 10.0.5
+ * @since 10.0.9
  */
 interface IVersionedObjectStorage {
 
@@ -36,7 +35,7 @@ interface IVersionedObjectStorage {
 	 *
 	 * @param string $urn the unified resource name used to identify the object
 	 * @return array
-	 * @since 10.0.5
+	 * @since 10.0.9
 	 */
 	public function getVersions($urn);
 
@@ -46,7 +45,7 @@ interface IVersionedObjectStorage {
 	 * @param string $urn the unified resource name used to identify the object
 	 * @param string $versionId
 	 * @return array
-	 * @since 10.0.5
+	 * @since 10.0.9
 	 */
 	public function getVersion($urn, $versionId);
 
@@ -56,7 +55,7 @@ interface IVersionedObjectStorage {
 	 * @param string $urn the unified resource name used to identify the object
 	 * @param string $versionId
 	 * @return resource
-	 * @since 10.0.5
+	 * @since 10.0.9
 	 */
 	public function getContentOfVersion($urn, $versionId);
 
@@ -66,15 +65,14 @@ interface IVersionedObjectStorage {
 	 * @param string $urn the unified resource name used to identify the object
 	 * @param string $versionId
 	 * @return boolean
-	 * @since 10.0.5
+	 * @since 10.0.9
 	 */
 	public function restoreVersion($urn, $versionId);
 
 	/**
 	 * Tells the storage to explicitly create a version of a given file
 	 * @return boolean
-	 * @since 10.0.5
+	 * @since 10.0.9
 	 */
 	public function saveVersion($internalPath);
-
 }

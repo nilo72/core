@@ -37,6 +37,9 @@ abstract class CacheableFlysystem extends \OCP\Files\Storage\FlysystemStorageAda
 	 */
 	protected $cacheContents = [];
 
+	/** @var bool */
+	protected $isCaseInsensitiveStorage;
+
 	/**
 	 * Get the location which will be used as a key in cache
 	 * If Storage is not case sensitive then convert the key to lowercase
@@ -55,7 +58,7 @@ abstract class CacheableFlysystem extends \OCP\Files\Storage\FlysystemStorageAda
 	public function buildPath($path) {
 		$location = parent::buildPath($path);
 		if ($this->isCaseInsensitiveStorage) {
-			$location = strtolower($location);
+			$location = \strtolower($location);
 		}
 		return $location;
 	}
@@ -105,7 +108,7 @@ abstract class CacheableFlysystem extends \OCP\Files\Storage\FlysystemStorageAda
 		} catch (FileNotFoundException $e) {
 			return false;
 		}
-		$names = array_map(function ($object) {
+		$names = \array_map(function ($object) {
 			return $object['basename'];
 		}, $content);
 		return IteratorDirectory::wrap($names);

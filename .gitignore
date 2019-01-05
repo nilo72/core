@@ -7,6 +7,8 @@
 /apps/inc.php
 /assets
 /build/composer.phar
+/build/phan.phar
+/build/phpstan.phar*
 /core/vendor
 
 # ignore all apps except core ones
@@ -22,7 +24,6 @@
 !/apps/files_versions
 !/apps/provisioning_api
 !/apps/systemtags
-!/apps/testing
 !/apps/theme-example
 !/apps/updatenotification
 /apps/files_external/3rdparty/irodsphp/PHPUnitTest
@@ -125,4 +126,5 @@ Vagrantfile
 /config/autoconfig.php
 clover.xml
 /tests/output
-
+.php_cs.cache
+.php_cs

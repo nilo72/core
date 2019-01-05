@@ -21,9 +21,7 @@
  *
  */
 
-
 namespace OCA\Federation\Tests;
-
 
 use OCA\Federation\DbHandler;
 use OCA\Federation\TrustedServers;
@@ -52,7 +50,7 @@ class DbHandlerTest extends TestCase {
 		parent::setUp();
 
 		$this->connection = \OC::$server->getDatabaseConnection();
-		$this->il10n = $this->createMock('OCP\IL10N');
+		$this->il10n = $this->createMock(IL10N::class);
 
 		$this->dbHandler = new DbHandler(
 			$this->connection,
@@ -76,6 +74,7 @@ class DbHandlerTest extends TestCase {
 	 * @param string $url passed to the method
 	 * @param string $expectedUrl the url we expect to be written to the db
 	 * @param string $expectedHash the hash value we expect to be written to the db
+	 * @throws \OC\HintException
 	 */
 	public function testAddServer($url, $expectedUrl, $expectedHash) {
 		$id = $this->dbHandler->addServer($url);
@@ -91,9 +90,9 @@ class DbHandlerTest extends TestCase {
 
 	public function dataTestAddServer() {
 		return [
-				['http://owncloud.org', 'http://owncloud.org', sha1('owncloud.org')],
-				['https://owncloud.org', 'https://owncloud.org', sha1('owncloud.org')],
-				['http://owncloud.org/', 'http://owncloud.org', sha1('owncloud.org')],
+				['http://owncloud.org', 'http://owncloud.org', \sha1('owncloud.org')],
+				['https://owncloud.org', 'https://owncloud.org', \sha1('owncloud.org')],
+				['http://owncloud.org/', 'http://owncloud.org', \sha1('owncloud.org')],
 		];
 	}
 
@@ -116,7 +115,6 @@ class DbHandlerTest extends TestCase {
 		$this->assertSame('server1', $result[0]['url']);
 		$this->assertSame($id1, (int)$result[0]['id']);
 	}
-
 
 	public function testGetServerById() {
 		$this->dbHandler->addServer('server1');
@@ -144,6 +142,7 @@ class DbHandlerTest extends TestCase {
 	 * @param string $serverInTable
 	 * @param string $checkForServer
 	 * @param bool $expected
+	 * @throws \OC\HintException
 	 */
 	public function testServerExists($serverInTable, $checkForServer, $expected) {
 		$this->dbHandler->addServer($serverInTable);
@@ -244,10 +243,10 @@ class DbHandlerTest extends TestCase {
 
 	public function dataTestHash() {
 		return [
-			['server1', sha1('server1')],
-			['http://server1', sha1('server1')],
-			['https://server1', sha1('server1')],
-			['http://server1/', sha1('server1')],
+			['server1', \sha1('server1')],
+			['http://server1', \sha1('server1')],
+			['https://server1', \sha1('server1')],
+			['http://server1/', \sha1('server1')],
 		];
 	}
 
@@ -275,6 +274,10 @@ class DbHandlerTest extends TestCase {
 
 	/**
 	 * @dataProvider providesAuth
+	 * @param $expectedResult
+	 * @param $user
+	 * @param $password
+	 * @throws \OC\HintException
 	 */
 	public function testAuth($expectedResult, $user, $password) {
 		if ($expectedResult) {

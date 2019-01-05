@@ -31,6 +31,8 @@ use Sabre\HTTP\Request;
 use Test\TestCase;
 use Test\Traits\MountProviderTrait;
 use Test\Traits\UserTrait;
+use OC\Files\Storage\Local;
+use OCP\IRequest;
 
 abstract class RequestTest extends TestCase {
 	use UserTrait;
@@ -42,9 +44,9 @@ abstract class RequestTest extends TestCase {
 	protected $serverFactory;
 
 	protected function getStream($string) {
-		$stream = fopen('php://temp', 'r+');
-		fwrite($stream, $string);
-		fseek($stream, 0);
+		$stream = \fopen('php://temp', 'r+');
+		\fwrite($stream, $string);
+		\fseek($stream, 0);
 		return $stream;
 	}
 
@@ -60,14 +62,14 @@ abstract class RequestTest extends TestCase {
 			\OC::$server->getUserSession(),
 			\OC::$server->getMountManager(),
 			\OC::$server->getTagManager(),
-			$this->createMock('\OCP\IRequest')
+			$this->createMock(IRequest::class)
 		);
 	}
 
 	protected function setupUser($name, $password) {
 		$this->createUser($name, $password);
 		$tmpFolder = \OC::$server->getTempManager()->getTemporaryFolder();
-		$this->registerMount($name, '\OC\Files\Storage\Local', '/' . $name, ['datadir' => $tmpFolder]);
+		$this->registerMount($name, Local::class, '/' . $name, ['datadir' => $tmpFolder]);
 		$this->loginAsUser($name);
 		return new View('/' . $name . '/files');
 	}
@@ -83,8 +85,8 @@ abstract class RequestTest extends TestCase {
 	 * @return \Sabre\HTTP\Response
 	 * @throws \Exception
 	 */
-	protected function request($view, $user, $password, $method, $url, $body = null, $headers = null) {
-		if (is_string($body)) {
+	protected function request($view, $user, $password, $method, $url, $body = null, $headers = []) {
+		if (\is_string($body)) {
 			$body = $this->getStream($body);
 		}
 		$this->logout();
@@ -96,9 +98,9 @@ abstract class RequestTest extends TestCase {
 
 		$originalServer = $_SERVER;
 
-		if (is_array($headers)) {
+		if (\is_array($headers)) {
 			foreach ($headers as $header => $value) {
-				$_SERVER['HTTP_' . strtoupper(str_replace('-', '_', $header))] = $value;
+				$_SERVER['HTTP_' . \strtoupper(\str_replace('-', '_', $header))] = $value;
 			}
 		}
 

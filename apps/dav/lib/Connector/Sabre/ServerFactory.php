@@ -29,7 +29,9 @@
 namespace OCA\DAV\Connector\Sabre;
 
 use OCA\DAV\DAV\FileCustomPropertiesBackend;
+use OCA\DAV\DAV\FileCustomPropertiesPlugin;
 use OCA\DAV\Files\BrowserErrorPagePlugin;
+use OCA\DAV\Files\FileLocksBackend;
 use OCP\Files\Mount\IMountManager;
 use OCP\IConfig;
 use OCP\IDBConnection;
@@ -110,30 +112,21 @@ class ServerFactory {
 		$server->addPlugin(new \OCA\DAV\Connector\Sabre\DummyGetResponsePlugin());
 		$server->addPlugin(new \OCA\DAV\Connector\Sabre\ExceptionLoggerPlugin('webdav', $this->logger));
 		$server->addPlugin(new \OCA\DAV\Connector\Sabre\LockPlugin());
-		// Some WebDAV clients do require Class 2 WebDAV support (locking), since
-		// we do not provide locking we emulate it using a fake locking plugin.
-		if($this->request->isUserAgent([
-			'/WebDAVFS/',
-			'/OneNote/',
-			'/Microsoft Office OneNote 2013/',
-			'/Microsoft-WebDAV-MiniRedir/',
-		])) {
-			$server->addPlugin(new \OCA\DAV\Connector\Sabre\FakeLockerPlugin());
-		}
+		$server->addPlugin(new \Sabre\DAV\Locks\Plugin(new FileLocksBackend($server->tree, true)));
 
 		if (BrowserErrorPagePlugin::isBrowserRequest($this->request)) {
 			$server->addPlugin(new BrowserErrorPagePlugin());
 		}
 
 		// wait with registering these until auth is handled and the filesystem is setup
-		$server->on('beforeMethod', function () use ($server, $objectTree, $viewCallBack) {
+		$server->on('beforeMethod:*', function () use ($server, $objectTree, $viewCallBack) {
 			// ensure the skeleton is copied
 			// Try to obtain User Folder
 			$userFolder = \OC::$server->getUserFolder();
 
 			/** @var \OC\Files\View $view */
 			$view = $viewCallBack($server);
-			if (!is_null($userFolder)) {
+			if ($userFolder !== null) {
 				// User folder exists and user is active and not anonymous
 				$rootInfo = $userFolder->getFileInfo();
 			} else {
@@ -161,7 +154,7 @@ class ServerFactory {
 			);
 			$server->addPlugin(new \OCA\DAV\Connector\Sabre\QuotaPlugin($view));
 
-			if($this->userSession->isLoggedIn()) {
+			if ($this->userSession->isLoggedIn()) {
 				$server->addPlugin(new \OCA\DAV\Connector\Sabre\TagsPlugin($objectTree, $this->tagManager));
 				$server->addPlugin(new \OCA\DAV\Connector\Sabre\SharesPlugin(
 					$objectTree,
@@ -179,10 +172,15 @@ class ServerFactory {
 					\OC::$server->getGroupManager(),
 					$userFolder
 				));
+				$server->addPlugin(
+					new \OCA\DAV\Connector\Sabre\FilesSearchReportPlugin(
+						\OC::$server->getSearch()
+					)
+				);
 
 				// custom properties plugin must be the last one
 				$server->addPlugin(
-					new \Sabre\DAV\PropertyStorage\Plugin(
+					new FileCustomPropertiesPlugin(
 						new FileCustomPropertiesBackend(
 							$objectTree,
 							$this->databaseConnection,

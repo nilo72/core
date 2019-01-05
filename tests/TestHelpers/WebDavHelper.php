@@ -22,22 +22,23 @@
 namespace TestHelpers;
 
 use Exception;
-use GuzzleHttp\Client as GClient;
+use GuzzleHttp\Message\ResponseInterface;
 use GuzzleHttp\Stream\Stream;
 use GuzzleHttp\Stream\StreamInterface;
 use InvalidArgumentException;
 use Sabre\DAV\Client as SClient;
+use SimpleXMLElement;
 
 /**
  * Helper to make WebDav Requests
- * 
+ *
  * @author Artur Neumann <artur@jankaritech.com>
  *
  */
 class WebDavHelper {
 	/**
 	 * returns the id of a file
-	 * 
+	 *
 	 * @param string $baseUrl
 	 * @param string $user
 	 * @param string $password
@@ -63,7 +64,7 @@ class WebDavHelper {
 		$response = self::makeDavRequest(
 			$baseUrl, $user, $password, "PROPFIND", $path, null, $body
 		);
-		preg_match('/\<oc:fileid\>(\d+)\<\/oc:fileid\>/', $response, $matches);
+		\preg_match('/\<oc:fileid\>(\d+)\<\/oc:fileid\>/', $response, $matches);
 		if (!isset($matches[1])) {
 			throw new Exception("could not find fileId of $path");
 		}
@@ -71,13 +72,117 @@ class WebDavHelper {
 	}
 
 	/**
-	 * 
+	 * sends a PROPFIND request
+	 * with these registered namespaces:
+	 *  | prefix | namespace                                 |
+	 *  | d      | DAV:                                      |
+	 *  | oc     | http://owncloud.org/ns                    |
+	 *  | ocs    | http://open-collaboration-services.org/ns |
+	 *
+	 * @param string $baseUrl
+	 * @param string $user
+	 * @param string $password
+	 * @param string $path
+	 * @param string[] $properties
+	 *        string can contain namespace prefix,
+	 *        if no prefix is given 'd:' is used as prefix
+	 * @param int $folderDepth
+	 * @param string $type
+	 * @param int $davPathVersionToUse
+	 *
+	 * @throws Exception
+	 *
+	 * @return ResponseInterface
+	 */
+	public static function propfind(
+		$baseUrl,
+		$user,
+		$password,
+		$path,
+		$properties,
+		$folderDepth = 0,
+		$type = "files",
+		$davPathVersionToUse = 2
+	) {
+		$headers = ['Depth' => $folderDepth];
+		$body = '<?xml version="1.0"?>
+				<d:propfind
+				   xmlns:d="DAV:"
+				   xmlns:oc="http://owncloud.org/ns"
+				   xmlns:ocs="http://open-collaboration-services.org/ns">
+					<d:prop>';
+		foreach ($properties as $property) {
+			//if no namespace is given in the property add the default one
+			if (\strpos($property, ":") === false) {
+				$property = "d:$property";
+			}
+			$body .= "<$property/>";
+		}
+
+		$body .= '</d:prop></d:propfind>';
+
+		$response = self::makeDavRequest(
+			$baseUrl, $user, $password, "PROPFIND", $path, $headers, $body,
+			null, $davPathVersionToUse, $type
+		);
+		return $response;
+	}
+
+	/**
+	 * returns the result parsed into a SimpleXMLElement
+	 * with these registered namespaces:
+	 *  | prefix | namespace                                 |
+	 *  | d      | DAV:                                      |
+	 *  | oc     | http://owncloud.org/ns                    |
+	 *  | ocs    | http://open-collaboration-services.org/ns |
+	 *
+	 * @param string $baseUrl
+	 * @param string $user
+	 * @param string $password
+	 * @param string $path
+	 * @param int $folderDepth
+	 * @param string[] $properties
+	 * @param string $type
+	 * @param int $davPathVersionToUse
+	 *
+	 * @return SimpleXMLElement
+	 */
+	public static function listFolder(
+		$baseUrl,
+		$user,
+		$password,
+		$path,
+		$folderDepth,
+		$properties = null,
+		$type = "files",
+		$davPathVersionToUse = 2
+	) {
+		if (!$properties) {
+			$properties = [
+				'getetag'
+			];
+		}
+		$response = self::propfind(
+			$baseUrl, $user, $password, $path, $properties,
+			$folderDepth, $type, $davPathVersionToUse
+		);
+		$responseXmlObject = HttpRequestHelper::getResponseXml($response);
+		$responseXmlObject->registerXPathNamespace('d', 'DAV:');
+		$responseXmlObject->registerXPathNamespace('oc', 'http://owncloud.org/ns');
+		$responseXmlObject->registerXPathNamespace(
+			'ocs', 'http://open-collaboration-services.org/ns'
+		);
+		return $responseXmlObject;
+	}
+
+	/**
+	 *
 	 * @param string $baseUrl
 	 * URL of owncloud e.g. http://localhost:8080
 	 * should include the subfolder if owncloud runs in a subfolder
 	 * e.g. http://localhost:8080/owncloud-core
 	 * @param string $user
-	 * @param string $password
+	 * @param string $password or token when bearer auth is used
 	 * @param string $method PUT, GET, DELETE, etc.
 	 * @param string $path
 	 * @param array $headers
@@ -86,9 +191,13 @@ class WebDavHelper {
 	 * @param int $davPathVersionToUse (1|2)
 	 * @param string $type of request
 	 * @param string $sourceIpAddress to initiate the request from
+	 * @param string $authType basic|bearer
+	 * @param bool $stream Set to true to stream a response rather
+	 *                     than download it all up-front.
+	 * @param int $timeout
+	 * @param Client|null $client
 	 *
-	 * @return \GuzzleHttp\Message\FutureResponse|\GuzzleHttp\Message\ResponseInterface|NULL
-	 * @throws \GuzzleHttp\Exception\BadResponseException
+	 * @return ResponseInterface
 	 */
 	public static function makeDavRequest(
 		$baseUrl,
@@ -101,53 +210,54 @@ class WebDavHelper {
 		$requestBody = null,
 		$davPathVersionToUse = 1,
 		$type = "files",
-		$sourceIpAddress = null
+		$sourceIpAddress = null,
+		$authType = "basic",
+		$stream = false,
+		$timeout = 0,
+		$client = null
 	) {
 		$baseUrl = self::sanitizeUrl($baseUrl, true);
 		$davPath = self::getDavPath($user, $davPathVersionToUse, $type);
 		//replace # and ? in the path, Guzzle will not encode them
 		$urlSpecialChar = [['#', '?'],['%23', '%3F']];
-		$path = str_replace($urlSpecialChar[0], $urlSpecialChar[1], $path);
+		$path = \str_replace($urlSpecialChar[0], $urlSpecialChar[1], $path);
 		$fullUrl = self::sanitizeUrl($baseUrl . $davPath . $path);
-		$client = new GClient();
-		
-		$options = [];
-		if (!is_null($requestBody)) {
-			$options['body'] = $requestBody;
+
+		if ($requestBody !== null) {
+			$body = $requestBody;
 		}
-		$options['auth'] = [$user, $password];
-		
-		if (!is_null($sourceIpAddress)) {
-			$options['config']
-				= [ 'curl' => [ CURLOPT_INTERFACE => $sourceIpAddress ]];
+		if ($authType === 'bearer') {
+			$headers['Authorization'] = 'Bearer ' . $password;
+			$user = null;
+			$password = null;
+		}
+		$config = null;
+		if ($sourceIpAddress !== null) {
+			$config = [ 'curl' => [ CURLOPT_INTERFACE => $sourceIpAddress ]];
 		}
 
-		$request = $client->createRequest($method, $fullUrl, $options);
-		if (!is_null($headers)) {
+		if ($headers !== null) {
 			foreach ($headers as $key => $value) {
 				//? and # need to be encoded in the Destination URL
 				if ($key === "Destination") {
-					$value = str_replace(
+					$value = \str_replace(
 						$urlSpecialChar[0], $urlSpecialChar[1], $value
 					);
-				}
-				if ($request->hasHeader($key) === true) {
-					$request->setHeader($key, $value);
-				} else {
-					$request->addHeader($key, $value);
+					$headers[$key] = $value;
+					break;
 				}
 			}
 		}
-		if (!is_null($body)) {
-			$request->setBody($body);
-		}
-		
-		return $client->send($request);
+
+		return HttpRequestHelper::sendRequest(
+			$fullUrl, $method, $user, $password, $headers, $body, $config, null,
+			$stream, $timeout, $client
+		);
 	}
 
 	/**
 	 * get the dav path
-	 * 
+	 *
 	 * @param string $user
 	 * @param int $davPathVersionToUse (1|2)
 	 * @param string $type
@@ -175,7 +285,7 @@ class WebDavHelper {
 
 	/**
 	 * returns a Sabre client
-	 * 
+	 *
 	 * @param string $baseUrl
 	 * @param string $user
 	 * @param string $password
@@ -184,18 +294,19 @@ class WebDavHelper {
 	 */
 	public static function getSabreClient($baseUrl, $user, $password) {
 		$settings = [
-				'baseUri' => $baseUrl,
+				'baseUri' => $baseUrl . "/",
 				'userName' => $user,
 				'password' => $password,
 				'authType' => SClient::AUTH_BASIC
 		];
-		
-		return new SClient($settings);
+		$client = new SClient($settings);
+		$client->addCurlSetting(CURLOPT_SSL_VERIFYPEER, false);
+		return $client;
 	}
 
 	/**
 	 * make sure there are no double slash in the URL
-	 * 
+	 *
 	 * @param string $url
 	 * @param bool $trailingSlash forces a trailing slash
 	 *
@@ -205,9 +316,32 @@ class WebDavHelper {
 		if ($trailingSlash === true) {
 			$url = $url . "/";
 		} else {
-			$url = rtrim($url, "/");
+			$url = \rtrim($url, "/");
 		}
-		$url = preg_replace("/([^:]\/)\/+/", '$1', $url);
+		$url = \preg_replace("/([^:]\/)\/+/", '$1', $url);
 		return $url;
+	}
+
+	/**
+	 * decides if the proposed dav version and chunking version are
+	 * a valid combination.
+	 * If no chunkingVersion is specified, then any dav version is valid.
+	 * If a chunkingVersion is specified, then it has to match the dav version.
+	 * Note: in future the dav and chunking versions might or might not
+	 * move together and/or be supported together. So a more complex
+	 * matrix could be needed here.
+	 *
+	 * @param string|int $davPathVersion
+	 * @param string|int|null $chunkingVersion
+	 *
+	 * @return boolean is this a valid combination
+	 */
+	public static function isValidDavChunkingCombination(
+		$davPathVersion, $chunkingVersion
+	) {
+		return (
+			($chunkingVersion === 'no' || $chunkingVersion === null) ||
+			($davPathVersion === $chunkingVersion)
+		);
 	}
 }

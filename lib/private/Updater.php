@@ -58,6 +58,9 @@ class Updater extends BasicEmitter {
 	/** @var Checker */
 	private $checker;
 
+	/** @var bool */
+	private $forceMajorUpgrade = false;
+
 	private $logLevelNames = [
 		0 => 'Debug',
 		1 => 'Info',
@@ -94,27 +97,28 @@ class Updater extends BasicEmitter {
 
 		$wasMaintenanceModeEnabled = $this->config->getSystemValue('maintenance', false);
 
-		if(!$wasMaintenanceModeEnabled) {
+		if (!$wasMaintenanceModeEnabled) {
 			$this->config->setSystemValue('maintenance', true);
 			$this->emit('\OC\Updater', 'maintenanceEnabled');
 		}
 
 		$installedVersion = $this->config->getSystemValue('version', '0.0.0');
-		$currentVersion = implode('.', Util::getVersion());
+		$currentVersion = \implode('.', Util::getVersion());
 		$this->log->debug('starting upgrade from ' . $installedVersion . ' to ' . $currentVersion, ['app' => 'core']);
 
 		$success = true;
 		try {
+			$this->checkAppsCompatibility();
 			$this->doUpgrade($currentVersion, $installedVersion);
 		} catch (\Exception $exception) {
 			$this->log->logException($exception, ['app' => 'core']);
-			$this->emit('\OC\Updater', 'failure', [get_class($exception) . ': ' .$exception->getMessage()]);
+			$this->emit('\OC\Updater', 'failure', [\get_class($exception) . ': ' .$exception->getMessage()]);
 			$success = false;
 		}
 
 		$this->emit('\OC\Updater', 'updateEnd', [$success]);
 
-		if(!$wasMaintenanceModeEnabled && $success) {
+		if (!$wasMaintenanceModeEnabled && $success) {
 			$this->config->setSystemValue('maintenance', false);
 			$this->emit('\OC\Updater', 'maintenanceDisabled');
 		} else {
@@ -141,7 +145,7 @@ class Updater extends BasicEmitter {
 
 		/** @var array $OC_VersionCanBeUpgradedFrom */
 		foreach ($OC_VersionCanBeUpgradedFrom as $version) {
-			$allowedPreviousVersions[] = implode('.', $version);
+			$allowedPreviousVersions[] = \implode('.', $version);
 		}
 
 		return $allowedPreviousVersions;
@@ -169,8 +173,8 @@ class Updater extends BasicEmitter {
 	public function isUpgradePossible($oldVersion, $newVersion, $allowedPreviousVersions) {
 		// TODO: write tests for this, since i just wrapped it to get started with migrations and this might fail in some cases
 		foreach ($allowedPreviousVersions as $allowedPreviousVersion) {
-			$allowedUpgrade =  (version_compare($allowedPreviousVersion, $oldVersion, '<=')
-				&& (version_compare($oldVersion, $newVersion, '<=') || $this->config->getSystemValue('debug', false)));
+			$allowedUpgrade =  (\version_compare($allowedPreviousVersion, $oldVersion, '<=')
+				&& (\version_compare($oldVersion, $newVersion, '<=') || $this->config->getSystemValue('debug', false)));
 			if ($allowedUpgrade) {
 				return $allowedUpgrade;
 			}
@@ -178,13 +182,41 @@ class Updater extends BasicEmitter {
 
 		// Upgrade not allowed, someone switching vendor?
 		if ($this->getVendor() !== $this->config->getAppValue('core', 'vendor', '')) {
-			$oldVersion = explode('.', $oldVersion);
-			$newVersion = explode('.', $newVersion);
+			$oldVersion = \explode('.', $oldVersion);
+			$newVersion = \explode('.', $newVersion);
 
 			return $oldVersion[0] === $newVersion[0] && $oldVersion[1] === $newVersion[1];
 		}
 
 		return false;
+	}
+
+	/**
+	 * @param $forceMajorUpgrade
+	 */
+	public function setForceMajorUpgrade($forceMajorUpgrade) {
+		$this->forceMajorUpgrade = $forceMajorUpgrade;
+	}
+
+	/**
+	 * Check if we have empty app folders or incompatible apps enabled
+	 */
+	private function checkAppsCompatibility() {
+		$dispatcher = \OC::$server->getEventDispatcher();
+		// App compatibility check
+		$repair = new Repair(
+			[
+				new Repair\Apps(
+					\OC::$server->getAppManager(),
+					$dispatcher,
+					$this->config,
+					new \OC_Defaults(),
+					$this->forceMajorUpgrade
+				),
+			],
+			$dispatcher
+		);
+		$repair->run();
 	}
 
 	/**
@@ -214,7 +246,7 @@ class Updater extends BasicEmitter {
 		// create empty file in data dir, so we can later find
 		// out that this is indeed an ownCloud data directory
 		// (in case it didn't exist before)
-		file_put_contents($this->config->getSystemValue('datadirectory', \OC::$SERVERROOT . '/data') . '/.ocdata', '');
+		\file_put_contents($this->config->getSystemValue('datadirectory', \OC::$SERVERROOT . '/data') . '/.ocdata', '');
 
 		// pre-upgrade repairs
 		$repair = new Repair(Repair::getBeforeUpgradeRepairSteps(), \OC::$server->getEventDispatcher());
@@ -249,14 +281,14 @@ class Updater extends BasicEmitter {
 		$this->config->setAppValue('core', 'lastupdatedat', 0);
 
 		// Check for code integrity if not disabled
-		if(\OC::$server->getIntegrityCodeChecker()->isCodeCheckEnforced()) {
+		if (\OC::$server->getIntegrityCodeChecker()->isCodeCheckEnforced()) {
 			$this->emit('\OC\Updater', 'startCheckCodeIntegrity');
 			$this->checker->runInstanceVerification();
 			$this->emit('\OC\Updater', 'finishedCheckCodeIntegrity');
 		}
 
 		// only set the final version if everything went well
-		$this->config->setSystemValue('version', implode('.', Util::getVersion()));
+		$this->config->setSystemValue('version', \implode('.', Util::getVersion()));
 		$this->config->setAppValue('core', 'vendor', $this->getVendor());
 	}
 
@@ -264,7 +296,7 @@ class Updater extends BasicEmitter {
 		$this->emit('\OC\Updater', 'dbUpgradeBefore');
 
 		// execute core migrations
-		if (is_dir(\OC::$SERVERROOT."/core/Migrations")) {
+		if (\is_dir(\OC::$SERVERROOT."/core/Migrations")) {
 			$ms = new \OC\DB\MigrationService('core', \OC::$server->getDatabaseConnection());
 			$ms->migrate();
 		}
@@ -287,7 +319,7 @@ class Updater extends BasicEmitter {
 		foreach ($apps as $appId) {
 			$priorityType = false;
 			foreach ($priorityTypes as $type) {
-				if(!isset($stacks[$type])) {
+				if (!isset($stacks[$type])) {
 					$stacks[$type] = [];
 				}
 				if (\OC_App::isType($appId, $type)) {
@@ -307,7 +339,7 @@ class Updater extends BasicEmitter {
 					\OC_App::updateApp($appId);
 					$this->emit('\OC\Updater', 'appUpgrade', [$appId, \OC_App::getAppVersion($appId)]);
 				}
-				if($type !== $pseudoOtherType) {
+				if ($type !== $pseudoOtherType) {
 					// load authentication, filesystem and logging apps after
 					// upgrading them. Other apps my need to rely on modifying
 					// user and/or filesystem aspects.
@@ -343,6 +375,4 @@ class Updater extends BasicEmitter {
 			}
 		});
 	}
-
 }
-

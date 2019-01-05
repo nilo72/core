@@ -54,6 +54,9 @@ class AssemblyStream implements \Icewind\Streams\File {
 	/** @var resource */
 	protected $currentStream = null;
 
+	/** @var IFile */
+	protected $currentNode;
+
 	/**
 	 * @param string $path
 	 * @param string $mode
@@ -67,20 +70,21 @@ class AssemblyStream implements \Icewind\Streams\File {
 		// sort the nodes
 		$nodes = $this->nodes;
 		// http://stackoverflow.com/a/10985500
-		@usort($nodes, function(IFile $a, IFile $b) {
-			return strnatcmp($a->getName(), $b->getName());
+		@\usort($nodes, function (IFile $a, IFile $b) {
+			return \strnatcmp($a->getName(), $b->getName());
 		});
 		$this->nodes = $nodes;
 
 		// build additional information
 		$this->sortedNodes = [];
 		$start = 0;
-		foreach($this->nodes as $node) {
+		foreach ($this->nodes as $node) {
 			$size = $node->getSize();
 			$name = $node->getName();
 			// ignore .zsync metadata file
-			if (!strcmp($name,".zsync"))
+			if (!\strcmp($name, ".zsync")) {
 				continue;
+			}
 			$this->sortedNodes[$name] = ['node' => $node, 'start' => $start, 'end' => $start + $size];
 			$start += $size;
 			$this->size = $start;
@@ -112,26 +116,26 @@ class AssemblyStream implements \Icewind\Streams\File {
 		do {
 			if ($this->currentStream === null) {
 				list($node, $posInNode) = $this->getNodeForPosition($this->pos);
-				if (is_null($node)) {
+				if ($node === null) {
 					// reached last node, no more data
 					return '';
 				}
 				$this->currentStream = $this->getStream($node);
-				fseek($this->currentStream, $posInNode);
+				\fseek($this->currentStream, $posInNode);
 			}
 
-			$data = fread($this->currentStream, $count);
+			$data = \fread($this->currentStream, $count);
 			// isset is faster than strlen
 			if (isset($data[$count - 1])) {
 				// we read the full count
 				$read = $count;
 			} else {
 				// reaching end of stream, which happens less often so strlen is ok
-				$read = strlen($data);
+				$read = \strlen($data);
 			}
 
-			if (feof($this->currentStream)) {
-				fclose($this->currentStream);
+			if (\feof($this->currentStream)) {
+				\fclose($this->currentStream);
 				$this->currentNode = null;
 				$this->currentStream = null;
 			}
@@ -207,7 +211,6 @@ class AssemblyStream implements \Icewind\Streams\File {
 		return true;
 	}
 
-
 	/**
 	 * Load the source from the stream context and return the context options
 	 *
@@ -216,13 +219,13 @@ class AssemblyStream implements \Icewind\Streams\File {
 	 * @throws \Exception
 	 */
 	protected function loadContext($name) {
-		$context = stream_context_get_options($this->context);
+		$context = \stream_context_get_options($this->context);
 		if (isset($context[$name])) {
 			$context = $context[$name];
 		} else {
 			throw new \BadMethodCallException('Invalid context, "' . $name . '" options not set');
 		}
-		if (isset($context['nodes']) and is_array($context['nodes'])) {
+		if (isset($context['nodes']) and \is_array($context['nodes'])) {
 			$this->nodes = $context['nodes'];
 		} else {
 			throw new \BadMethodCallException('Invalid context, nodes not set');
@@ -237,18 +240,18 @@ class AssemblyStream implements \Icewind\Streams\File {
 	 * @throws \BadMethodCallException
 	 */
 	public static function wrap(array $nodes, IFile $backingFile = null, $length = null) {
-		$context = stream_context_create([
+		$context = \stream_context_create([
 			'assembly' => [
 				'nodes' => $nodes]
 		]);
-		stream_wrapper_register('assembly', '\OCA\DAV\Upload\AssemblyStream');
+		\stream_wrapper_register('assembly', '\OCA\DAV\Upload\AssemblyStream');
 		try {
-			$wrapped = fopen('assembly://', 'r', null, $context);
+			$wrapped = \fopen('assembly://', 'r', null, $context);
 		} catch (\BadMethodCallException $e) {
-			stream_wrapper_unregister('assembly');
+			\stream_wrapper_unregister('assembly');
 			throw $e;
 		}
-		stream_wrapper_unregister('assembly');
+		\stream_wrapper_unregister('assembly');
 		return $wrapped;
 	}
 
@@ -257,7 +260,7 @@ class AssemblyStream implements \Icewind\Streams\File {
 	 * @return IFile | null
 	 */
 	protected function getNodeForPosition($pos) {
-		foreach($this->sortedNodes as $node) {
+		foreach ($this->sortedNodes as $node) {
 			if ($pos >= $node['start'] && $pos < $node['end']) {
 				return [$node['node'], $pos - $node['start']];
 			}
@@ -271,11 +274,10 @@ class AssemblyStream implements \Icewind\Streams\File {
 	 */
 	protected function getStream(IFile $node) {
 		$data = $node->get();
-		if (is_resource($data)) {
+		if (\is_resource($data)) {
 			return $data;
 		}
 
-		return fopen('data://text/plain,' . $data,'r');
+		return \fopen('data://text/plain,' . $data, 'r');
 	}
-
 }

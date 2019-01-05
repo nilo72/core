@@ -38,6 +38,11 @@ class LoginPage extends OwncloudPage {
 	protected $userInputId = "user";
 	protected $passwordInputId = "password";
 	protected $submitLoginId = "submit";
+	protected $lostPasswordId = "lost-password";
+	protected $setPasswordErrorMessageId = "error-message";
+
+	protected $imprintUrlXpath = "//a[contains(text(),'Imprint')]";
+	protected $privacyPolicyXpath = "//a[contains(text(),'Privacy Policy')]";
 
 	/**
 	 * @param string $username
@@ -52,13 +57,11 @@ class LoginPage extends OwncloudPage {
 		$this->fillField($this->passwordInputId, $password);
 		$submitElement = $this->findById($this->submitLoginId);
 
-		if ($submitElement === null) {
-			throw new ElementNotFoundException(
-				__METHOD__ .
-				" id $this->submitLoginId " .
-				"could not find login submit button"
-			);
-		}
+		$this->assertElementNotNull(
+			$submitElement,
+			__METHOD__ .
+			" id $this->submitLoginId could not find login submit button"
+		);
 
 		$submitElement->click();
 
@@ -77,18 +80,18 @@ class LoginPage extends OwncloudPage {
 	 */
 	public function waitTillPageIsLoaded(
 		Session $session,
-		$timeout_msec = STANDARDUIWAITTIMEOUTMILLISEC
+		$timeout_msec = STANDARD_UI_WAIT_TIMEOUT_MILLISEC
 	) {
-		$currentTime = microtime(true);
+		$currentTime = \microtime(true);
 		$end = $currentTime + ($timeout_msec / 1000);
 		while ($currentTime <= $end) {
-			if ((!is_null($this->findById($this->userInputId)))
-				&& (!is_null($this->findById($this->passwordInputId)))
+			if (($this->findById($this->userInputId) !== null)
+				&& ($this->findById($this->passwordInputId) !== null)
 			) {
 				break;
 			}
-			usleep(STANDARDSLEEPTIMEMICROSEC);
-			$currentTime = microtime(true);
+			\usleep(STANDARD_SLEEP_TIME_MICROSEC);
+			$currentTime = \microtime(true);
 		}
 
 		if ($currentTime > $end) {
@@ -98,5 +101,106 @@ class LoginPage extends OwncloudPage {
 		}
 
 		$this->waitForOutstandingAjaxCalls($session);
+	}
+
+	/**
+	 *
+	 * @throws ElementNotFoundException
+	 *
+	 * @return Page
+	 */
+	private function lostPasswordField() {
+		$lostPasswordField = $this->findById($this->lostPasswordId);
+		$this->assertElementNotNull(
+			$lostPasswordField,
+			__METHOD__ .
+			" id $this->lostPasswordId could not find reset password field "
+		);
+		return $lostPasswordField;
+	}
+
+	/**
+	 *
+	 * @throws ElementNotFoundException
+	 *
+	 * @return Page
+	 */
+	private function getSetPasswordErrorMessageField() {
+		$setPasswordErrorMessageField = $this->findById($this->setPasswordErrorMessageId);
+		$this->assertElementNotNull(
+			$setPasswordErrorMessageField,
+			__METHOD__ .
+			" id $this->setPasswordErrorMessageId could not find set password error message field"
+		);
+		return $setPasswordErrorMessageField;
+	}
+
+	/**
+	 * @param Session $session
+	 *
+	 * @return void
+	 */
+	public function requestPasswordReset(Session $session) {
+		$this->lostPasswordField()->click();
+		$this->waitForAjaxCallsToStartAndFinish($session);
+	}
+
+	/**
+	 *
+	 * @return string
+	 */
+	public function getLostPasswordMessage() {
+		$passwordRecoveryMessage = $this->lostPasswordField()->getText();
+		return $passwordRecoveryMessage;
+	}
+
+	/**
+	 *
+	 * @return string
+	 */
+	public function getSetPasswordErrorMessage() {
+		$setPasswordErrorMessage = $this->getSetPasswordErrorMessageField()->getText();
+		return $setPasswordErrorMessage;
+	}
+
+	/**
+	 *
+	 * @param string $newPassword
+	 * @param Session $session
+	 *
+	 * @return void
+	 */
+	public function resetThePassword($newPassword, Session $session) {
+		$this->fillField($this->passwordInputId, $newPassword);
+		$this->findById($this->submitLoginId)->click();
+		$this->waitForAjaxCallsToStartAndFinish($session);
+	}
+
+	/**
+	 *
+	 * @param string $legalUrlType
+	 *
+	 * @return string imprint url link
+	 * @throws \Exception
+	 */
+	public function getLegalUrl($legalUrlType) {
+		if ($legalUrlType === "Imprint") {
+			$legalUrlLink = $this->find("xpath", $this->imprintUrlXpath);
+		} elseif ($legalUrlType === "Privacy Policy") {
+			$legalUrlLink = $this->find("xpath", $this->privacyPolicyXpath);
+		} else {
+			throw new \Exception(
+				__METHOD__ . " invalid legal url type: $legalUrlType"
+			);
+		}
+
+		$this->assertElementNotNull(
+			$legalUrlLink,
+			__METHOD__ .
+			" id $this->imprintUrlXpath " .
+			"could not find link"
+		);
+
+		return($legalUrlLink->getAttribute("href"));
 	}
 }

@@ -72,7 +72,6 @@ class LostControllerTest extends TestCase {
 	private $userSession;
 
 	protected function setUp() {
-
 		$this->existingUser = $this->getMockBuilder('OCP\IUser')
 				->disableOriginalConstructor()->getMock();
 
@@ -88,8 +87,8 @@ class LostControllerTest extends TestCase {
 		$this->l10n
 			->expects($this->any())
 			->method('t')
-			->will($this->returnCallback(function($text, $parameters = []) {
-				return vsprintf($text, $parameters);
+			->will($this->returnCallback(function ($text, $parameters = []) {
+				return \vsprintf($text, $parameters);
 			}));
 		$this->defaults = $this->getMockBuilder('\OC_Defaults')
 			->disableOriginalConstructor()->getMock();
@@ -172,7 +171,6 @@ class LostControllerTest extends TestCase {
 			'guest');
 		$this->assertEquals($expectedResponse, $response);
 	}
-
 
 	public function testResetFormExpiredToken() {
 		$user = $this->getMockBuilder('\OCP\IUser')
@@ -365,9 +363,13 @@ class LostControllerTest extends TestCase {
 		$message
 			->expects($this->at(2))
 			->method('setPlainBody')
-			->with('Use the following link to reset your password: https://ownCloud.com/index.php/lostpassword/');
+			->with($this->stringContains('Use the following link to reset your password: https://ownCloud.com/index.php/lostpassword/'));
 		$message
 			->expects($this->at(3))
+			->method('setHtmlBody')
+			->with($this->stringContains('Use the following link to reset your password: <a href="https://ownCloud.com/index.php/lostpassword/">https://ownCloud.com/index.php/lostpassword/</a>'));
+		$message
+			->expects($this->at(4))
 			->method('setFrom')
 			->with(['lostpassword-noreply@localhost' => null]);
 		$this->mailer
@@ -426,9 +428,13 @@ class LostControllerTest extends TestCase {
 		$message
 			->expects($this->at(2))
 			->method('setPlainBody')
-			->with('Use the following link to reset your password: https://ownCloud.com/index.php/lostpassword/');
+			->with($this->stringContains('Use the following link to reset your password: https://ownCloud.com/index.php/lostpassword/'));
 		$message
 			->expects($this->at(3))
+			->method('setHtmlBody')
+			->with($this->stringContains('Use the following link to reset your password: <a href="https://ownCloud.com/index.php/lostpassword/">https://ownCloud.com/index.php/lostpassword/</a>'));
+		$message
+			->expects($this->at(4))
 			->method('setFrom')
 			->with(['lostpassword-noreply@localhost' => null]);
 		$this->mailer
@@ -524,7 +530,6 @@ class LostControllerTest extends TestCase {
 			->expects($this->at(1))
 			->method('send')
 			->with($message);
-
 
 		$response = $this->lostController->setPassword('TheOnlyAndOnlyOneTokenToResetThePassword', 'ValidTokenUser', 'NewPassword', true);
 		$expectedResponse = ['status' => 'success'];
@@ -623,5 +628,4 @@ class LostControllerTest extends TestCase {
 			];
 		$this->assertSame($expectedResponse, $response);
 	}
-
 }

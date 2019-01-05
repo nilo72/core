@@ -41,7 +41,7 @@
 			'{{/if}}' +
 			'<div id="linkPass-{{cid}}" class="public-link-modal--item linkPass">' +
 				'<label class="public-link-modal--label" for="linkPassText-{{cid}}">{{passwordLabel}}</label>' +
-				'<input class="public-link-modal--input linkPassText" id="linkPassText-{{cid}}" type="password" placeholder="{{passwordPlaceholder}}" />' +
+				'<input class="public-link-modal--input linkPassText" id="linkPassText-{{cid}}" type="password" autocomplete="off" placeholder="{{passwordPlaceholder}}" />' +
 				'<span class="error-message hidden"></span>' +
 			'</div>' +
 			'<div class="expirationDateContainer"></div>' +
@@ -121,18 +121,23 @@
 			var deferred = $.Deferred();
 			var $el = this.$el;
 
-			var $password = $el.find('.linkPassText'),
-				$inputs = $el.find('.linkPassText, .expirationDate, .permission'), // all input fields combined
+			var $formElements       = $el.find('input, textarea, select, button'),
+				$select2Elements    = $el.find('.select2-search-choice-close'),
+				$password           = $el.find('.linkPassText'),
+				$inputs             = $el.find('.linkPassText, .expirationDate, .permission'), // all input fields combined
 				$errorMessageGlobal = $el.find('.error-message-global'),
-				$loading = $el.find('.loading'),
-				password = $password.val(),
-				expirationDate = this.expirationView.getValue();
+				$loading            = $el.find('.loading'),
+
+				password            = $password.val(),
+				expirationDate      = this.expirationView.getValue();
 
 			$el.find('.error-message').addClass('hidden');
 
-			// remove errors (if present)
-			// ***
+			// prevent tinkering with form while loading
+			$formElements.prop('disabled', true);
+			$select2Elements.addClass('hidden');
 
+			// remove errors
 			$inputs.removeClass('error');
 			$errorMessageGlobal.addClass('hidden');
 
@@ -167,7 +172,10 @@
 			}
 
 			if (!validates) {
-				deferred.reject(this.model);
+				$loading.addClass('hidden');
+				$formElements.removeAttr('disabled');
+				$select2Elements.removeClass('hidden');
+				return deferred.reject(this.model);
 			}
 
 			if (this.model.isNew()) {
@@ -205,6 +213,8 @@
 					var msg = xhr.responseJSON.ocs.meta.message;
 					// destroy old tooltips
 					$loading.addClass('hidden');
+					$formElements.removeAttr('disabled');
+					$select2Elements.removeClass('hidden');
 					$errorMessageGlobal.removeClass('hidden').text(msg);
 					deferred.reject(self.model);
 				}
@@ -282,9 +292,9 @@
 		},
 
 		_onClickReset: function () {
-			var $dialog              = $('.oc-dialog:visible'),
-				$inputPassword       = $dialog.find('.linkPassText'),
-				$buttonReset         = $dialog.find('.removePassword');
+			var $dialog        = $('.oc-dialog:visible'),
+				$inputPassword = $dialog.find('.linkPassText'),
+				$buttonReset   = $dialog.find('.removePassword');
 
 			this.model.set("resetPassword", true);
 
@@ -330,14 +340,14 @@
 
 			if (this.model.isNew()) {
 				title = t('core', 'Create link share: {name}', {name: this.itemModel.getFileInfo().getFullPath()});
-				buttons.unshift({
+				buttons.push({
 					text: t('core', 'Share'),
 					click: _.bind(this._onClickSave, this),
 					defaultButton: true
 				})
 			}
 			else {
-				buttons.unshift({
+				buttons.push({
 					text: t('core', 'Save'),
 					click: _.bind(this._onClickSave, this),
 					defaultButton: true
@@ -346,7 +356,7 @@
 
 			if (this.model.get('encryptedPassword')) {
 				buttons.push({
-					classes: 'removePassword -float-left',
+					classes: 'removePassword',
 					text: t('core', 'Remove password'),
 					click: _.bind(this._onClickReset, this),
 					defaultButton: false

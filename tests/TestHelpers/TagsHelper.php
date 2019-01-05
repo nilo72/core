@@ -21,6 +21,8 @@
  */
 namespace TestHelpers;
 
+use GuzzleHttp\Message\ResponseInterface;
+
 /**
  * Helper to administer Tags
  *
@@ -36,10 +38,12 @@ class TagsHelper {
 	 * @param string $password
 	 * @param string $tagName
 	 * @param string $fileName
-	 * @param string $fileOwner
+	 * @param string|null $fileOwner
+	 * @param string|null $fileOwnerPassword
 	 * @param int $davPathVersionToUse (1|2)
 	 *
-	 * @return \GuzzleHttp\Message\FutureResponse|\GuzzleHttp\Message\ResponseInterface|NULL
+	 * @return ResponseInterface
+	 * @throws \Exception
 	 */
 	public static function tag(
 		$baseUrl,
@@ -47,17 +51,26 @@ class TagsHelper {
 		$password,
 		$tagName,
 		$fileName,
-		$fileOwner,
+		$fileOwner = null,
+		$fileOwnerPassword = null,
 		$davPathVersionToUse = 1
 	) {
+		if ($fileOwner === null) {
+			$fileOwner = $taggingUser;
+		}
+
+		if ($fileOwnerPassword === null) {
+			$fileOwnerPassword = $password;
+		}
+
 		$fileID = WebDavHelper::getFileIdForPath(
-			$baseUrl, $fileOwner, $password, $fileName
+			$baseUrl, $fileOwner, $fileOwnerPassword, $fileName
 		);
 
 		$tag = self::requestTagByDisplayName(
 			$baseUrl, $taggingUser, $password, $tagName
 		);
-		$tagID = (int) $tag ['{http://owncloud.org/ns}id'];
+		$tagID = (int) $tag['{http://owncloud.org/ns}id'];
 		$path = '/systemtags-relations/files/' . $fileID . '/' . $tagID;
 		$response = WebDavHelper::makeDavRequest(
 			$baseUrl, $taggingUser, $password, "PUT",
@@ -92,7 +105,7 @@ class TagsHelper {
 			'{http://owncloud.org/ns}can-assign'
 		];
 		if ($withGroups) {
-			array_push($properties, '{http://owncloud.org/ns}groups');
+			\array_push($properties, '{http://owncloud.org/ns}groups');
 		}
 		$appPath = '/systemtags/';
 		$fullUrl = $baseUrl
@@ -138,11 +151,11 @@ class TagsHelper {
 	 * @param string $name
 	 * @param bool $userVisible
 	 * @param bool $userAssignable
+	 * @param bool $userEditable
 	 * @param string $groups separated by "|"
 	 * @param int $davPathVersionToUse (1|2)
 	 *
-	 * @return array ['lastTagId', 'HTTPResponse']
-	 * @throws \GuzzleHttp\Exception\ClientException
+	 * @return ResponseInterface
 	 * @link self::makeDavRequest()
 	 */
 	public static function createTag(
@@ -152,6 +165,7 @@ class TagsHelper {
 		$name,
 		$userVisible = true,
 		$userAssignable = true,
+		$userEditable = false,
 		$groups = null,
 		$davPathVersionToUse = 2
 	) {
@@ -160,13 +174,14 @@ class TagsHelper {
 			'name' => $name,
 			'userVisible' => $userVisible,
 			'userAssignable' => $userAssignable,
+			'userEditable' => $userEditable
 		];
 
-		if (!is_null($groups)) {
+		if ($groups !== null) {
 			$body['groups'] = $groups;
 		}
 
-		$response = WebDavHelper::makeDavRequest(
+		return WebDavHelper::makeDavRequest(
 			$baseUrl,
 			$user,
 			$password,
@@ -174,14 +189,10 @@ class TagsHelper {
 			$tagsPath,
 			['Content-Type' => 'application/json',],
 			null,
-			json_encode($body),
+			\json_encode($body),
 			$davPathVersionToUse,
 			"systemtags"
 		);
-		$responseHeaders = $response->getHeaders();
-		$tagUrl = $responseHeaders['Content-Location'][0];
-		$lastTagId = substr($tagUrl, strrpos($tagUrl, '/') + 1);
-		return ['lastTagId' => $lastTagId, 'HTTPResponse' => $response];
 	}
 
 	/**
@@ -192,8 +203,7 @@ class TagsHelper {
 	 * @param int $tagID
 	 * @param int $davPathVersionToUse (1|2)
 	 *
-	 * @return \GuzzleHttp\Message\FutureResponse|\GuzzleHttp\Message\ResponseInterface|NULL
-	 * @throws \GuzzleHttp\Exception\ClientException
+	 * @return ResponseInterface
 	 */
 	public static function deleteTag(
 		$baseUrl,
@@ -205,7 +215,7 @@ class TagsHelper {
 		$tagsPath = '/systemtags/' . $tagID;
 		$response = WebDavHelper::makeDavRequest(
 			$baseUrl, $user, $password,
-			"DELETE", $tagsPath, [ ], null, null, $davPathVersionToUse, "systemtags"
+			"DELETE", $tagsPath, [], null, null, $davPathVersionToUse, "systemtags"
 		);
 		return $response;
 	}
@@ -218,21 +228,25 @@ class TagsHelper {
 	 * @return boolean[]
 	 */
 	public static function validateTypeOfTag($type) {
-		$userVisible = true;
-		$userAssignable = true;
+		$userVisible = "1";
+		$userAssignable = "1";
+		$userEditable = "1";
 		switch ($type) {
-			case 'normal' :
+			case 'normal':
 				break;
-			case 'not user-assignable' :
-				$userAssignable = false;
+			case 'not user-assignable':
+				$userAssignable = "0";
 				break;
-			case 'not user-visible' :
-				$userVisible = false;
+			case 'not user-visible':
+				$userVisible = "0";
 				break;
-			default :
+			case 'static':
+				$userEditable = "0";
+				break;
+			default:
 				throw new \Exception('Unsupported type');
 		}
 
-		return array($userVisible, $userAssignable);
+		return [$userVisible, $userAssignable, $userEditable];
 	}
 }

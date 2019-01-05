@@ -33,6 +33,9 @@ class AddMember extends Command {
 	/** @var \OCP\IGroupManager */
 	protected $groupManager;
 
+	/** @var IUserManager  */
+	private $userManager;
+
 	/**
 	 * @param IGroupManager $groupManager
 	 */
@@ -69,7 +72,7 @@ class AddMember extends Command {
 
 		$members = $input->getOption('member');
 
-		if (!count($members)) {
+		if (!\count($members)) {
 			$output->writeln('<error>No members specified</error>');
 			return 1;
 		}

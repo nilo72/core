@@ -76,7 +76,7 @@ class ConnectionFactory {
 	 */
 	public function __construct(SystemConfig $systemConfig) {
 		$this->config = $systemConfig;
-		if($this->config->getValue('mysql.utf8mb4', false)) {
+		if ($this->config->getValue('mysql.utf8mb4', false)) {
 			$this->defaultConnectionParams['mysql']['charset'] = 'utf8mb4';
 		}
 	}
@@ -95,7 +95,7 @@ class ConnectionFactory {
 		$result = $this->defaultConnectionParams[$normalizedType];
 		// \PDO::MYSQL_ATTR_FOUND_ROWS may not be defined, e.g. when the MySQL
 		// driver is missing. In this case, we won't be able to connect anyway.
-		if ($normalizedType === 'mysql' && defined('\PDO::MYSQL_ATTR_FOUND_ROWS')) {
+		if ($normalizedType === 'mysql' && \defined('\PDO::MYSQL_ATTR_FOUND_ROWS')) {
 			$result['driverOptions'] = [
 				\PDO::MYSQL_ATTR_FOUND_ROWS => true,
 			];
@@ -117,30 +117,22 @@ class ConnectionFactory {
 			case 'mysql':
 				$eventManager->addEventSubscriber(
 					new SQLSessionInit("SET SESSION AUTOCOMMIT=1"));
-				$eventManager->addEventListener(
-					Events::onSchemaColumnDefinition,
-					new MySqlSchemaColumnDefinitionListener()
-				);
 				break;
 			case 'oci':
 				$eventManager->addEventSubscriber(new OracleSessionInit);
 				// the driverOptions are unused in dbal and need to be mapped to the parameters
 				if (isset($additionalConnectionParams['driverOptions'])) {
-					$additionalConnectionParams = array_merge($additionalConnectionParams, $additionalConnectionParams['driverOptions']);
+					$additionalConnectionParams = \array_merge($additionalConnectionParams, $additionalConnectionParams['driverOptions']);
 				}
 				break;
 			case 'sqlite3':
 				$journalMode = $additionalConnectionParams['sqlite.journal_mode'];
-				$additionalConnectionParams['platform'] = new OCSqlitePlatform();
 				$eventManager->addEventSubscriber(new SQLiteSessionInit(true, $journalMode));
-				break;
-			case 'pgsql':
-				$additionalConnectionParams['platform'] = new OCPostgreSqlPlatform();
 				break;
 		}
 		/** @var Connection $connection */
 		$connection = DriverManager::getConnection(
-			array_merge($this->getDefaultConnectionParams($type), $additionalConnectionParams),
+			\array_merge($this->getDefaultConnectionParams($type), $additionalConnectionParams),
 			new Configuration(),
 			$eventManager
 		);
@@ -186,10 +178,10 @@ class ConnectionFactory {
 			$connectionParams['path'] = $dataDir . '/' . $name . '.db';
 		} else {
 			$host = $this->config->getValue('dbhost', '');
-			if (strpos($host, ':')) {
+			if (\strpos($host, ':')) {
 				// Host variable may carry a port or socket.
-				list($host, $portOrSocket) = explode(':', $host, 2);
-				if (ctype_digit($portOrSocket)) {
+				list($host, $portOrSocket) = \explode(':', $host, 2);
+				if (\ctype_digit($portOrSocket)) {
 					$connectionParams['port'] = $portOrSocket;
 				} else {
 					$connectionParams['unix_socket'] = $portOrSocket;
@@ -214,7 +206,7 @@ class ConnectionFactory {
 			'tablePrefix' => $connectionParams['tablePrefix']
 		];
 
-		if($this->config->getValue('mysql.utf8mb4', false)) {
+		if ($this->config->getValue('mysql.utf8mb4', false)) {
 			$connectionParams['defaultTableOptions'] = [
 				'collate' => 'utf8mb4_bin',
 				'charset' => 'utf8mb4',
